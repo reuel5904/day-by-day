@@ -21,6 +21,7 @@ Signed-out history and each account's cached history use separate browser storag
 
 - Larger, compact workout cards and optional result logging.
 - Individual completion checkboxes and Check all for exercises, sections, or the whole workout, with Undo.
+- Choose Classic beep, Soft chime, Bell, or Digital pulse in the timer or Settings & backup; test the selected alarm and keep your choice in this browser.
 - Rest presets of 30, 45, 60, 90, and 120 seconds, plus custom minutes and seconds, pause/reset/add-time, and a repeating alarm with Stop alarm.
 - Schedule, session notes, rescheduling, weekly completion, rest-aware streaks, exercise history, comparable personal bests, and running time/distance/pace.
 - Numerical results remain separate from completion: checking sets never invents reps, times, or personal bests.
