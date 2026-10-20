@@ -23,6 +23,7 @@ Signed-out history and each account's cached history use separate browser storag
 - Individual completion checkboxes and Check all for exercises, sections, or the whole workout, with Undo.
 - Choose Classic beep, Soft chime, Bell, or Digital pulse in the timer or Settings & backup; test the selected alarm and keep your choice in this browser.
 - Rest presets of 30, 45, 60, 90, and 120 seconds, plus custom minutes and seconds, pause/reset/add-time, and a repeating alarm with Stop alarm.
+- Progress shows checked sets, active training days, weekly completed/planned workouts, strength/running totals, and clearly marked Sunday recovery. Checkmarks update activity stats immediately; measurements remain optional and never inferred from targets.
 - Schedule, session notes, rescheduling, weekly completion, rest-aware streaks, exercise history, comparable personal bests, and running time/distance/pace.
 - Numerical results remain separate from completion: checking sets never invents reps, times, or personal bests.
 - Offline reopening after an online visit. Keep the page open and interact once for timer audio; locked-screen alerts are not guaranteed.

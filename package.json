@@ -11,7 +11,7 @@
     "build": "vite build && node scripts/publish-static.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 5174",
     "check": "tsc --noEmit",
-    "test": "node scripts/test-pages.mjs && node scripts/test-sync.mjs"
+    "test": "node scripts/test-pages.mjs && node scripts/test-sync.mjs && node scripts/test-progress.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.118.0",
