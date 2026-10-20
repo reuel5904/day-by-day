@@ -6,7 +6,18 @@ Follow the original October 13, 2026–January 10, 2027 program, check off indiv
 
 ## GitHub Pages version
 
-This is a static app. It saves history in your browser, works without an account, and does not send workout results to a server. Export JSON through Settings & backup to keep a backup or move history to another browser.
+The interface is a static app on GitHub Pages. It saves history immediately in your browser and works without an account. Optional Supabase sign-in shares private training history across browsers and devices.
+
+### Sync your progress
+
+1. Open **Settings & backup** and enter your email address.
+2. Open the emailed sign-in link in the browser you want to use.
+3. Open Settings again and choose **Add browser history to my account** to include any existing device-only progress. The original browser copy stays intact.
+4. Sign in with the same email on your other browsers and devices.
+
+Changes sync shortly after editing, on focus/reconnection, and every 45 seconds while the app is open. **Sync now** refreshes immediately. Offline edits remain queued until an upload succeeds. Concurrent edits remain available for explicit resolution, and retrying an upload never rewrites an existing event. A history download reads all pages rather than stopping at the Data API's 1,000-row default.
+
+Signed-out history and each account's cached history use separate browser storage. Signing out on one browser leaves other devices signed in; any queued changes remain available when that account signs back in. Timer state and sound preferences stay local to each browser. Export JSON through Settings & backup to keep an independent backup.
 
 - Larger, compact workout cards and optional result logging.
 - Individual completion checkboxes and Check all for exercises, sections, or the whole workout, with Undo.
@@ -17,13 +28,21 @@ This is a static app. It saves history in your browser, works without an account
 
 Existing original-app checkmarks and notes are carried over automatically on the same browser and origin. The original `day-by-day-v1` storage is retained untouched. Imported completions have no assumed actual performance date and do not fabricate set measurements or streaks. Extra-long original notes are also retained in the imported legacy record and the untouched original storage key.
 
-## Private synced version
+## Supabase setup
 
-The separately hosted **https://day-by-day-training.nice-star-0243.chatgpt.site/** uses private ChatGPT sign-in and shared history across devices. The Pages app links to it in Settings & backup. The two apps have separate browser storage; export/import your JSON to transfer existing history. GitHub Pages itself does not run the private sign-in or database backend.
+The **Day by Day** project (`tkuybjpgfmjzsbcpuaol`, US East) is in Reuel Enterprises. The publishable key in `web/src/supabase.ts` is intended for browser use. Never add a secret or service-role key to the app.
+
+`supabase/migrations/` records the deployed schema. `training_events` is append-only, with `(user_id, id)` as its primary key. Authenticated users may select and insert only rows owned by their verified Supabase identity. Anonymous access, direct updates, and deletes are not granted. Corrections and deletions use resolving events in the existing history model.
+
+Authentication uses Supabase's default email magic link and persistent browser sessions. The Site URL is `https://reuel5904.github.io/day-by-day/`; the exact local testing return URL `http://127.0.0.1:5175/day-by-day/` is also allowed. No wildcard redirects are configured.
+
+Supabase's built-in email service is limited to organization-member email addresses and a low sending rate. This setup is for the owner's personal use. Configure custom SMTP in Supabase before inviting other people. No paid email service or Supabase plan was enabled.
+
+The former separately hosted ChatGPT-sign-in version remains independent. Export/import JSON to bring any history from that version into this app.
 
 ## Development
 
-Node.js 22.13+ is required.
+Node.js 22.13+ is required. Use `npm run dev -- --port 5175 --strictPort` when testing email sign-in locally, matching the allowed redirect URL.
 
 ```sh
 npm ci
@@ -42,4 +61,4 @@ The build writes a static output to `dist/`, then updates the tracked root `inde
 
 Commit the source and generated artifacts together, then push to `main`; GitHub Pages publishes them automatically. No Actions token or new hosting credentials are needed. Do not edit generated `assets/` or the root `index.html` directly.
 
-The tests cover routine integrity, set completion, conflict preservation, streak rules, and original-history migration. See `GLOSSARY.md`, `docs/design.md`, and `docs/adr/` for product behavior and decisions.
+The tests cover routine integrity, set completion, conflict preservation, streak rules, original-history migration, account isolation, retry behavior, concurrent edits, malformed responses, and paginated downloads. `supabase/tests/training_history.sql` verifies real database role access inside a rolled-back transaction, including anonymous denial, cross-account isolation, and immutable retry semantics. See `GLOSSARY.md`, `docs/design.md`, and `docs/adr/` for product behavior and decisions.
