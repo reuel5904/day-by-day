@@ -1,31 +1,16 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f5f0"><meta name="description" content="Your day-by-day calisthenics and running plan, from the first rep to the 5K."><title>Day by day — Your training plan</title><link rel="stylesheet" href="styles.css"><script src="routine.js" defer></script><script src="app.js" defer></script></head>
-<body>
-<aside class="sidebar">
-<a class="brand" href="index.html" aria-label="Day by day home"><span class="brand-icon">d<span>↗</span></span><span>day by day<span class="brand-sub">THE TRAINING PLAN</span></span></a>
-<div class="side-label">YOUR PROGRAM</div>
-<div class="program-name">Stronger.<br>One day at a time.</div>
-<p class="side-muted">Calisthenics + running<br>Oct 13, 2026 — Jan 10, 2027</p>
-<label class="side-label" for="week-select">TRAINING WEEK</label>
-<select id="week-select"></select>
-<nav id="week-nav" aria-label="Training weeks"></nav>
-<div class="side-bottom"><span class="tiny-dot"></span> A little better, every session.<a href="routine.md" download>↓ Original routine</a></div>
-</aside>
-<main>
-<header class="topbar"><span>YOUR PERSONAL TRAINING SPACE</span><button id="today" class="button light">Jump to today <span>↗</span></button></header>
-<section class="intro"><div><div class="eyebrow">SHOW UP. BUILD MOMENTUM.</div><h1>Make today count<span>.</span></h1><p>Your plan is ready. Just take it one session at a time.</p></div><div class="goal"><span class="goal-icon">⚑</span><div><small>THE FINISH LINE</small><strong>January 9 · 5K</strong><span>From the first rep to the victory lap.</span></div></div></section>
-<section class="week-heading"><div><div class="eyebrow" id="week-code"></div><h2 id="week-title"></h2></div><div class="week-controls"><button class="icon-button" id="prev-week" aria-label="Previous week">←</button><span id="week-range"></span><button class="icon-button" id="next-week" aria-label="Next week">→</button></div></section>
-<div id="days" class="days" role="group" aria-label="Choose a training day"></div>
-<div class="workspace">
-<section class="session"><div class="session-head"><div><span id="type" class="type"></span><h2 id="session-title"></h2><p id="session-date"></p></div><span id="session-symbol" class="session-symbol" aria-hidden="true">↗</span></div>
-<div class="progress-label"><span id="progress-text"></span><strong id="progress-percent"></strong></div><div class="progress-track"><div id="progress-bar"></div></div>
-<div id="exercises"></div><div class="session-footer"><span id="complete-message"></span><button id="complete" class="button primary"></button></div></section>
-<aside class="tools"><section class="note-card"><div class="eyebrow">THIS WEEK’S FOCUS</div><h3 id="focus-title"></h3><p id="week-note"></p></section>
-<section class="timer-card"><div class="tool-heading"><h3>Take a breather</h3><span aria-hidden="true">◷</span></div><p>Your rest, between the reps.</p><div id="timer-display" role="timer" aria-live="off">01:30</div><div class="presets" aria-label="Rest duration"><button data-seconds="30">30s</button><button data-seconds="45">45s</button><button data-seconds="60">60s</button><button data-seconds="90" class="active">90s</button><button data-seconds="120">2m</button></div><div class="timer-actions"><button id="timer-start" class="button primary">Start timer</button><button id="timer-reset" class="icon-button" aria-label="Reset timer">↺</button></div><span id="timer-status" class="sr-only" role="status"></span></section>
-<section class="notes-card"><div class="tool-heading"><label for="notes">Session notes</label><span aria-hidden="true">✎</span></div><p>Reps, times, wins. Keep a record.</p><textarea id="notes" placeholder="How did it go? Log your numbers here…" rows="5"></textarea><small id="save-status" role="status">Saved on this device</small></section>
-<details class="guide"><summary>A quick reminder <span>+</span></summary><p>Supersets: do one set of the first exercise, go straight into the second, then rest.</p><p>From W1: hit the top of the range on every set before advancing next session. Bracketed stages are the plan’s likely stages.</p></details>
-</aside></div>
-<footer><span>DAY BY DAY <span class="footer-dot">/</span> CONSISTENCY OVER PERFECTION</span><div><button id="export" class="text-button">Export progress ↓</button><label class="text-button import">Import progress ↑<input id="import" type="file" accept="application/json,.json"></label></div></footer><p id="storage-warning" role="status" hidden></p>
-</main><noscript>This training plan needs JavaScript. You can also read the <a href="routine.md">original routine</a>.</noscript>
-</body></html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#345d47" />
+    <meta name="description" content="Your personal calisthenics and running companion. Follow your plan, check off sets, and see your progress." />
+    <link rel="icon" href="/day-by-day/favicon.svg" type="image/svg+xml" />
+    <title>Day by Day — A little stronger, every session</title>
+    <script type="module" crossorigin src="/day-by-day/assets/index-CzMRRXYh.js"></script>
+    <link rel="stylesheet" crossorigin href="/day-by-day/assets/index-BcsYTx6i.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

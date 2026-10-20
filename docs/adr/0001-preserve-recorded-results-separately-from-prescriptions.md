@@ -1,0 +1,3 @@
+# Preserve recorded results separately from prescriptions
+
+The existing tracker stores exercise checkmarks and notes, while the redesign will use individual set results to show performance and suggest progression. Preserve prescriptions, actual results, and the exercise variation performed as distinct information; imported checkmarks retain completion history but do not imply measured repetitions, performance dates, or personal bests. This leaves gaps in historical performance rather than manufacturing a complete-looking record, and keeps future comparisons grounded in results the user actually recorded.
