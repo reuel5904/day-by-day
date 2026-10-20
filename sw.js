@@ -1,5 +1,5 @@
 const CACHE_PREFIX='dbd-pages-'+new URL(self.registration.scope).pathname.replace(/[^a-z0-9]/gi,'_')+'-';
-const CACHE=CACHE_PREFIX+'905356b34d49';
+const CACHE=CACHE_PREFIX+'763bda76cfd6';
 const APP_ROOT=new URL(self.registration.scope).pathname;
 self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',event=>event.waitUntil((async()=>{for(const name of await caches.keys())if(name.startsWith(CACHE_PREFIX)&&name!==CACHE)await caches.delete(name);await self.clients.claim();})()));
