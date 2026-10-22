@@ -63,6 +63,8 @@ Sources: [styles.css](https://github.com/reuel5904/day-by-day/blob/main/styles.c
 
 ## Implementation
 
+The first bullet is superseded by [ADR-0005](adr/0005-sync-through-supabase-inside-pages.md): sign-in and sync now run inside the Pages app through Supabase. The rest still applies.
+
 - Build with the Sites Vinext starter, private ChatGPT sign-in, and a user-scoped D1 event history.
 - Cache the app for offline reopening after an online visit. Use device-local storage as an immediate write buffer, and the authenticated database for cross-device durability.
 - Each edit names its prior versions. Concurrent branches remain visible conflicts; a deliberate resolution references both parents. Retries are idempotent.
@@ -99,5 +101,7 @@ The user requested quick completion at set, exercise/section, and whole-workout 
 - Browser verification covered the 30-second selection, a custom 1:15 duration, and rejection of 0:00.
 
 ## GitHub Pages publication
+
+Superseded by [ADR-0005](adr/0005-sync-through-supabase-inside-pages.md): the Pages app now has its own sign-in and shared history, and no separate synced app is linked.
 
 The user explicitly selected the complete static interface on GitHub Pages with device-local history, retaining the private synced app separately. Pages saves in the current browser; Settings links to the private version for shared history. Original Pages history migrates automatically and its source storage key is retained. The published source includes a reproducible static build, checks, and migration tests.

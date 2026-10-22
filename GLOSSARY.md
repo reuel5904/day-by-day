@@ -73,6 +73,24 @@ _Avoid_: Partial session, completed workout
 A workout marked complete in the original version of the app. It counts as a completed workout but has no actual training date or set results.
 _Avoid_: Legacy completion
 
+### Exercises
+
+**Exercise**:
+A movement tracked under one name across every program, such as Pull-Ups, Chin-Ups or Calf Raises. Its easier and harder versions are variations, not separate exercises.
+_Avoid_: Movement, chain
+
+**Variation**:
+A version of an exercise at one level of difficulty, such as tucked, decline, single-leg or weighted.
+_Avoid_: Stage, tier, level
+
+**Progression chain**:
+An exercise's variations in order of difficulty, such as Push-Ups, then Decline, then Archer. Advancing means moving to the next variation.
+_Avoid_: Stage list, tiers
+
+**Assistance**:
+Support that makes a set easier without changing its variation, such as a band or a chair.
+_Avoid_: Variation, setup
+
 ### Performance
 
 **Performance**:
