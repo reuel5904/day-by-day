@@ -41,6 +41,9 @@ import {
   addDays,
   completionChanges,
   completionKey,
+  currentVariation,
+  fixedTarget,
+  isFinished,
   isSetComplete,
   dateLabel,
   Day,
@@ -63,7 +66,9 @@ import {
   setKey,
   streaks,
   topOf,
+  untickChanges,
   validateEvents,
+  workoutStatus,
 } from './training-model';
 
 type User = { id: string; name: string; email: string } | null;
@@ -72,14 +77,7 @@ import ProgressOverview from './progress-overview';
 import { ALARM_SOUNDS, alarmSound, type AlarmSoundId } from './timer-sounds';
 import { supabase } from './supabase';
 import { syncHistory } from './cloud-sync';
-import {
-  addHistory,
-  combineStores,
-  emptyStore,
-  readStore,
-  storageKey,
-  type Store,
-} from './sync-store';
+import { addHistory, combineStores, readStore, storageKey, type Store } from './sync-store';
 type TimerState = {
   end: number | null;
   remaining: number;
@@ -100,6 +98,43 @@ const firstToday = () => {
   const now = localDate();
   return days.find((d) => d.date >= now)?.date || days.at(-1)!.date;
 };
+const remainingAt = (t: TimerState) =>
+  t.running && t.end ? Math.max(0, Math.ceil((t.end - Date.now()) / 1000)) : t.remaining;
+// Only the countdown re-renders while a timer runs, not the whole app.
+function useTicker(running: boolean) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => setTick((n) => n + 1), 250);
+    return () => clearInterval(t);
+  }, [running]);
+}
+function Countdown({ timer }: { timer: TimerState }) {
+  useTicker(timer.running);
+  return <>{formatTime(remainingAt(timer))}</>;
+}
+function TimerRing({ timer }: { timer: TimerState }) {
+  useTicker(timer.running);
+  const remaining = remainingAt(timer);
+  return (
+    <div className="timer-ring">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <circle cx="100" cy="100" r="90" />
+        <circle
+          className="timer-arc"
+          cx="100"
+          cy="100"
+          r="90"
+          strokeDasharray={565.5}
+          strokeDashoffset={565.5 * (1 - Math.min(1, remaining / Math.max(1, timer.duration)))}
+        />
+      </svg>
+      <div>
+        <span className="timer-numbers">{formatTime(remaining)}</span>
+      </div>
+    </div>
+  );
+}
 const unitLabel = (u: string) => (u === 'sec' ? 'seconds' : u === 'run' ? 'miles' : 'reps');
 const sameResult = (a: any, b: any) =>
   a.name === b.name &&
@@ -138,7 +173,6 @@ export default function TrainingApp({ user }: { user: User }) {
   const [muted, setMuted] = useState(false);
   const [alarmTest, setAlarmTest] = useState(false);
   const [timer, setTimer] = useState<TimerState>(idleTimer);
-  const [tick, setTick] = useState(Date.now());
   const [timerOpen, setTimerOpen] = useState(false);
   const [started, setStarted] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -194,7 +228,7 @@ export default function TrainingApp({ user }: { user: User }) {
   }, []);
   const map = useMemo(() => heads(store.events), [store.events]);
   const day = days.find((d) => d.date === selected) || days[0];
-  const recordedSessionDate = latest(map, `session:${selected}`)?.actualDate;
+  const recordedSessionDate = workoutStatus(day, map, today).actualDate;
   useEffect(
     () => setLoggingDate(recordedSessionDate || today),
     [selected, today, recordedSessionDate],
@@ -321,16 +355,17 @@ export default function TrainingApp({ user }: { user: User }) {
         .catch(() => {});
     return () => window.removeEventListener('storage', onStorage);
   }, [key, notify]);
-  let localHistory = emptyStore();
-  if (user) {
+  let localCount = 0;
+  if (user && settings) {
     try {
-      localHistory = readStore(localStorage, storageKey());
+      const accountIds = new Set(store.events.map((event) => event.id));
+      localCount = readStore(localStorage, storageKey()).events.filter(
+        (event) => !accountIds.has(event.id),
+      ).length;
     } catch {
       /* Keep unreadable local history untouched. */
     }
   }
-  const accountIds = new Set(store.events.map((event) => event.id));
-  const localCount = localHistory.events.filter((event) => !accountIds.has(event.id)).length;
   const addLocalHistory = () => {
     try {
       const incoming = readStore(localStorage, storageKey());
@@ -457,20 +492,14 @@ export default function TrainingApp({ user }: { user: User }) {
   }, [timer.done, alarmTest, muted, chime, silenceAlarm]);
   useEffect(() => () => silenceAlarm(), [silenceAlarm]);
   useEffect(() => {
-    if (!timer.running) return;
-    const t = setInterval(() => setTick(Date.now()), 200);
-    return () => clearInterval(t);
-  }, [timer.running]);
-  const remaining =
-    timer.running && timer.end
-      ? Math.max(0, Math.ceil((timer.end - tick) / 1000))
-      : timer.remaining;
-  useEffect(() => {
-    if (timer.running && timer.end && remaining === 0) {
+    if (!timer.running || !timer.end) return;
+    const timeUp = () => {
       setTimer((t) => ({ ...t, running: false, end: null, remaining: 0, done: true }));
       notify('Time’s up. Your next set is ready.');
-    }
-  }, [remaining, timer.running, timer.end, chime, notify]);
+    };
+    const t = setTimeout(timeUp, Math.max(0, timer.end - Date.now()));
+    return () => clearTimeout(t);
+  }, [timer.running, timer.end, notify]);
   useEffect(() => {
     if (!loaded) return;
     try {
@@ -497,7 +526,6 @@ export default function TrainingApp({ user }: { user: User }) {
   const startRest = (duration: number, label: string) => {
     if (!duration) return;
     unlockAudio();
-    setTick(Date.now());
     setTimer({
       end: Date.now() + duration * 1000,
       remaining: duration,
@@ -508,10 +536,9 @@ export default function TrainingApp({ user }: { user: User }) {
   };
   const toggleTimer = () => {
     unlockAudio();
-    setTick(Date.now());
     setTimer((t) =>
       t.running
-        ? { ...t, remaining, end: null, running: false }
+        ? { ...t, remaining: remainingAt(t), end: null, running: false }
         : {
             ...t,
             end: Date.now() + (t.remaining || t.duration) * 1000,
@@ -524,9 +551,9 @@ export default function TrainingApp({ user }: { user: User }) {
   const addTime = () =>
     setTimer((t) => ({
       ...t,
-      duration: Math.max(t.duration, remaining + 30),
+      duration: Math.max(t.duration, remainingAt(t) + 30),
       end: t.running ? (t.end || Date.now()) + 30000 : null,
-      remaining: remaining + 30,
+      remaining: remainingAt(t) + 30,
       done: false,
     }));
   const setRestDuration = (duration: number) => {
@@ -570,7 +597,7 @@ export default function TrainingApp({ user }: { user: User }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const due = (d: Day) => effectiveDate(d, map);
-  const session = latest(map, `session:${selected}`);
+  const status = workoutStatus(day, map, today);
   const countFor = (e: Exercise) => latest(map, `config:${day.date}:${e.id}`)?.count || e.count;
   const prescribed = (section: Section, e: Exercise): Exercise => {
     const count = countFor(e);
@@ -579,11 +606,14 @@ export default function TrainingApp({ user }: { user: User }) {
       ? { ...e, count, target: option.target, top: topOf(option.target) }
       : { ...e, count };
   };
-  const allSetKeys = day.sections.flatMap((b) =>
-    b.exercises.flatMap((e) =>
-      Array.from({ length: countFor(e) }, (_, i) => setKey(day.date, e, i)),
-    ),
-  );
+  const setsOf = (section: Section) =>
+    section.exercises
+      .map((e) => prescribed(section, e))
+      .flatMap((e) =>
+        Array.from({ length: e.count }, (_, i) => ({ key: setKey(day.date, e, i), exercise: e })),
+      );
+  const allSets = day.sections.flatMap(setsOf);
+  const allSetKeys = allSets.map((set) => set.key);
   const doneKeys = allSetKeys.filter((k) => isSetComplete(map, k));
   const percent = allSetKeys.length ? Math.round((doneKeys.length / allSetKeys.length) * 100) : 0;
   const weekStart = mondayOf(selected);
@@ -591,9 +621,7 @@ export default function TrainingApp({ user }: { user: User }) {
   const planned = days.filter(
     (d) => d.sections.length && due(d) >= weekStart && due(d) <= addDays(weekStart, 6),
   );
-  const completed = planned.filter((d) =>
-    ['complete', 'legacy-complete'].includes(latest(map, `session:${d.date}`)?.status),
-  );
+  const completed = planned.filter((d) => isFinished(workoutStatus(d, map, today)));
   const streak = streaks(map, today);
   const results = resultEntries(map);
   const conflicts = Object.entries(map).filter(([, v]) => v.length > 1);
@@ -681,36 +709,38 @@ export default function TrainingApp({ user }: { user: User }) {
       return;
     }
     const done = isSetComplete(map, k);
-    write(completionKey(k), { completed: !done, day: selected, actualDate: loggingDate });
+    writeMany(
+      done
+        ? untickChanges(map, k, selected, loggingDate)
+        : completionChanges(map, [{ key: k, exercise: e }], selected, loggingDate),
+    );
     setBulkUndo([]);
     if (!done) afterSingleCompletion(e, i, section, false);
   };
-  const checkAll = (keys: string[], label: string) => {
+  const checkAll = (sets: { key: string; exercise: Exercise }[], label: string) => {
     if (!validTrainingDate()) return;
-    const changes = completionChanges(map, keys, selected, loggingDate);
+    const changes = completionChanges(map, sets, selected, loggingDate);
     if (!changes.length) {
       notify('Everything here is already checked, or has an edit conflict to review.');
       return;
     }
     const written = writeMany(changes);
     setBulkUndo(
-      changes.map((change) => ({
+      changes.map((change, n) => ({
         entity: change.entity,
         before: latest(map, change.entity) ?? null,
-        appliedId: written.find((e) => e.entity === change.entity)!.id,
+        appliedId: written[n].id,
       })),
     );
     stopAlarm();
-    const hasConflicts = keys.some((k) => map[k]?.length > 1 || map[completionKey(k)]?.length > 1);
+    const hasConflicts = sets.some(
+      ({ key }) => map[key]?.length > 1 || map[completionKey(key)]?.length > 1,
+    );
     notify(
       hasConflicts
-        ? 'Available sets checked. Review conflicting edits before finishing.'
-        : `${label} checked. You can add results anytime.`,
+        ? 'Available sets checked. Review the conflicting edits for the rest.'
+        : `${label} checked. Fixed targets were recorded; add any other numbers anytime.`,
     );
-    if (label === 'Workout' && !hasConflicts) {
-      setActualDate(loggingDate);
-      setModal('finish');
-    }
   };
   const undoCheckAll = () => {
     const current = heads(storeRef.current.events);
@@ -722,7 +752,7 @@ export default function TrainingApp({ user }: { user: User }) {
       .map((change) => ({ entity: change.entity, data: change.before }));
     if (changes.length) writeMany(changes);
     setBulkUndo([]);
-    notify('Bulk check undone. Your logged results are preserved.');
+    notify('Check all undone. Numbers you entered yourself are kept.');
   };
   const saveSet = (e: Exercise, i: number, data: any, section: Section) => {
     if (!validTrainingDate()) return;
@@ -750,9 +780,9 @@ export default function TrainingApp({ user }: { user: User }) {
     ]);
     afterSingleCompletion(e, i, section, wasComplete);
   };
-  const finish = () => {
+  const finishEarly = () => {
     if (!actualDate || actualDate > today || actualDate < days[0].date) {
-      notify('Choose an actual training date between the plan start and today.');
+      notify('Choose an actual training date between the program start and today.');
       return;
     }
     const missing = allSetKeys.filter((k) => !isSetComplete(map, k));
@@ -769,35 +799,17 @@ export default function TrainingApp({ user }: { user: User }) {
     const values: { entity: string; data: any }[] = missing
       .filter((k) => !latest(map, k))
       .map((entity) => ({ entity, data: { skipped: true, day: selected } }));
-    for (const k of allSetKeys) {
-      if (latest(map, k) && !latest(map, k).skipped)
-        values.push({ entity: k, data: { ...latest(map, k), actualDate } });
-      if (latest(map, completionKey(k)))
-        values.push({
-          entity: completionKey(k),
-          data: { ...latest(map, completionKey(k)), actualDate },
-        });
-    }
     values.push({
       entity: `session:${selected}`,
-      data: {
-        status: missing.length ? 'partial' : 'complete',
-        actualDate,
-        finishedAt: new Date().toISOString(),
-        setKeys: allSetKeys,
-      },
+      data: { status: 'partial', actualDate, finishedAt: new Date().toISOString() },
     });
     writeMany(values);
     setBulkUndo([]);
     stopAlarm();
     setModal(null);
     setStarted(false);
-    setTimer((t) => ({ ...t, running: false, end: null, remaining }));
-    notify(
-      missing.length
-        ? 'Partial workout saved. Every recorded set counts.'
-        : 'Workout complete. One more day in the books.',
-    );
+    setTimer((t) => ({ ...t, running: false, end: null, remaining: remainingAt(t) }));
+    notify('Partial workout saved. Every ticked set counts.');
   };
   const exportData = () => {
     const blob = new Blob(
@@ -851,7 +863,9 @@ export default function TrainingApp({ user }: { user: User }) {
     <>
       <div className="timer-mini-copy">
         <span className="eyebrow">{timer.done ? 'REST COMPLETE' : 'REST TIMER'}</span>
-        <strong>{formatTime(remaining)}</strong>
+        <strong>
+          <Countdown timer={timer} />
+        </strong>
       </div>
       <button
         className="timer-play"
@@ -862,10 +876,15 @@ export default function TrainingApp({ user }: { user: User }) {
       </button>
     </>
   );
+  const recentWorkouts = days
+    .map((d) => ({ day: d, status: workoutStatus(d, map, today) }))
+    .filter(({ status }) => ['complete', 'partial', 'legacy'].includes(status.id))
+    .sort((a, b) =>
+      (b.status.actualDate || b.day.date).localeCompare(a.status.actualDate || a.day.date),
+    )
+    .slice(0, 10);
   const totalComplete = programDays(program).filter(
-    (d) =>
-      d.sections.length &&
-      ['complete', 'legacy-complete'].includes(latest(map, `session:${d.date}`)?.status),
+    (d) => d.sections.length && isFinished(workoutStatus(d, map, today)),
   ).length;
   const trendNames = Array.from(
     new Set(
@@ -1096,7 +1115,7 @@ export default function TrainingApp({ user }: { user: User }) {
                 {weekDays.map((date) => {
                   const workouts = days.filter((d) => due(d) === date);
                   const d = workouts[0];
-                  const status = d ? latest(map, `session:${d.date}`)?.status : null;
+                  const finished = d ? isFinished(workoutStatus(d, map, today)) : false;
                   const sel = workouts.some((x) => x.date === selected);
                   return (
                     <button
@@ -1119,9 +1138,9 @@ export default function TrainingApp({ user }: { user: User }) {
                       <span>{dateLabel(date, { weekday: 'short' })}</span>
                       <strong>{dateLabel(date, { day: 'numeric' })}</strong>
                       <span
-                        className={`day-marker ${status === 'complete' || status === 'legacy-complete' ? 'done' : !d?.sections.length ? 'rest' : d && isRunDay(d) ? 'run' : 'strength'}`}
+                        className={`day-marker ${finished ? 'done' : !d?.sections.length ? 'rest' : d && isRunDay(d) ? 'run' : 'strength'}`}
                       >
-                        {status === 'complete' || status === 'legacy-complete' ? (
+                        {finished ? (
                           <Check size={10} />
                         ) : !d?.sections.length ? (
                           <>
@@ -1165,7 +1184,9 @@ export default function TrainingApp({ user }: { user: User }) {
                       <button
                         className="icon-button"
                         aria-label="Reschedule workout"
-                        disabled={!day.sections.length || Boolean(session?.status)}
+                        disabled={
+                          !day.sections.length || isFinished(status) || status.id === 'partial'
+                        }
                         onClick={() => {
                           setMoveDate(due(day) < today ? today : due(day));
                           setModal('move');
@@ -1237,11 +1258,11 @@ export default function TrainingApp({ user }: { user: User }) {
                     {day.sections.length > 0 && (
                       <div className="hero-bottom">
                         <span>
-                          {session?.status === 'complete'
+                          {status.id === 'complete'
                             ? 'Completed. Nicely done.'
-                            : session?.status === 'partial'
+                            : status.id === 'partial'
                               ? 'Partial workout saved'
-                              : session?.status === 'legacy-complete'
+                              : status.id === 'legacy'
                                 ? 'Imported completion · results not recorded'
                                 : started
                                   ? 'You’re in. Make each set count.'
@@ -1306,7 +1327,7 @@ export default function TrainingApp({ user }: { user: User }) {
                         <button
                           className="check-all-button"
                           disabled={percent === 100}
-                          onClick={() => checkAll(allSetKeys, 'Workout')}
+                          onClick={() => checkAll(allSets, 'Workout')}
                         >
                           <CheckCheck size={17} />
                           Check all
@@ -1362,11 +1383,7 @@ export default function TrainingApp({ user }: { user: User }) {
                               )}
                               onClick={() =>
                                 checkAll(
-                                  section.exercises.flatMap((e) =>
-                                    Array.from({ length: countFor(e) }, (_, i) =>
-                                      setKey(day.date, e, i),
-                                    ),
-                                  ),
+                                  setsOf(section),
                                   section.kind === 'superset' ? 'Section' : section.name,
                                 )
                               }
@@ -1414,12 +1431,10 @@ export default function TrainingApp({ user }: { user: User }) {
                               write={write}
                               notify={notify}
                               results={results}
-                              onToggle={(i) => toggleSet(e, i, section)}
+                              onToggle={(i) => toggleSet(prescribed(section, e), i, section)}
                               onCheckAll={() =>
                                 checkAll(
-                                  Array.from({ length: countFor(e) }, (_, i) =>
-                                    setKey(day.date, e, i),
-                                  ),
+                                  setsOf(section).filter((set) => set.exercise.id === e.id),
                                   e.name,
                                 )
                               }
@@ -1447,28 +1462,32 @@ export default function TrainingApp({ user }: { user: User }) {
                       <div className="finish-workout">
                         <div>
                           <strong>
-                            {percent === 100
+                            {status.id === 'complete'
                               ? 'You put in the work.'
                               : 'Every set is a step forward.'}
                           </strong>
                           <p>
-                            {percent === 100
-                              ? 'Save your session and see your progress.'
-                              : 'Finish whenever you’re ready. Partial sessions are saved too.'}
+                            {status.id === 'complete'
+                              ? 'Workout complete. It counts as soon as every set is ticked.'
+                              : status.id === 'partial'
+                                ? 'Saved as a partial workout. Tick the rest to complete it.'
+                                : 'It completes when every set is ticked. Warm-up and cool-down are optional.'}
                           </p>
                         </div>
-                        <button
-                          className="primary"
-                          onClick={() => {
-                            if (note !== (latest(map, `notes:${selected}`)?.text || ''))
-                              write(`notes:${selected}`, { text: note });
-                            setActualDate(loggingDate);
-                            setModal('finish');
-                          }}
-                        >
-                          <CheckCheck size={18} />
-                          {session?.status ? 'Update workout' : 'Finish workout'}
-                        </button>
+                        {status.id === 'started' && (
+                          <button
+                            className="secondary"
+                            onClick={() => {
+                              if (note !== (latest(map, `notes:${selected}`)?.text || ''))
+                                write(`notes:${selected}`, { text: note });
+                              setActualDate(loggingDate);
+                              setModal('finish');
+                            }}
+                          >
+                            <CheckCheck size={18} />
+                            Finish early
+                          </button>
+                        )}
                       </div>
                     </section>
                   )}
@@ -1488,30 +1507,12 @@ export default function TrainingApp({ user }: { user: User }) {
                         <Volume2 size={18} />
                       </button>
                     </div>
-                    <div className="timer-ring">
-                      <svg viewBox="0 0 200 200" aria-hidden="true">
-                        <circle cx="100" cy="100" r="90" />
-                        <circle
-                          className="timer-arc"
-                          cx="100"
-                          cy="100"
-                          r="90"
-                          strokeDasharray={565.5}
-                          strokeDashoffset={
-                            565.5 * (1 - Math.min(1, remaining / Math.max(1, timer.duration)))
-                          }
-                        />
-                      </svg>
-                      <div>
-                        <span className="timer-numbers">{formatTime(remaining)}</span>
-                      </div>
-                    </div>
+                    <TimerRing timer={timer} />
                     <div className="timer-controls">
                       <button
                         className="icon-button"
                         aria-label="Restart timer"
                         onClick={() => {
-                          setTick(Date.now());
                           setTimer((t) => ({
                             ...t,
                             remaining: t.duration,
@@ -1524,7 +1525,11 @@ export default function TrainingApp({ user }: { user: User }) {
                       </button>
                       <button className="primary timer-start" onClick={toggleTimer}>
                         {timer.running ? <Pause size={17} /> : <Play size={17} />}{' '}
-                        {timer.running ? 'Pause' : remaining === 0 ? 'Restart' : 'Start timer'}
+                        {timer.running
+                          ? 'Pause'
+                          : timer.remaining === 0
+                            ? 'Restart'
+                            : 'Start timer'}
                       </button>
                       <button className="icon-button" aria-label="Add 30 seconds" onClick={addTime}>
                         <Plus size={19} />
@@ -1694,7 +1699,7 @@ export default function TrainingApp({ user }: { user: User }) {
                       </summary>
                       <div className="schedule-days">
                         {list.map((d) => {
-                          const status = latest(map, `session:${d.date}`)?.status;
+                          const status = workoutStatus(d, map, today);
                           return (
                             <button
                               key={d.date}
@@ -1720,22 +1725,12 @@ export default function TrainingApp({ user }: { user: User }) {
                                 <strong>{d.title}</strong>
                                 <span>
                                   {due(d) !== d.date ? `Moved from ${dateLabel(d.date)} · ` : ''}
-                                  {!d.sections.length
-                                    ? 'Recovery is part of the plan'
-                                    : status === 'complete'
-                                      ? 'Workout complete'
-                                      : status === 'legacy-complete'
-                                        ? 'Imported completion'
-                                        : status === 'partial'
-                                          ? 'Partial workout saved'
-                                          : due(d) < today
-                                            ? 'Not completed'
-                                            : due(d) === today
-                                              ? 'Today’s session'
-                                              : `${d.sections.length} sections`}
+                                  {status.id === 'upcoming' && due(d) !== today
+                                    ? `${d.sections.length} sections`
+                                    : status.label}
                                 </span>
                               </span>
-                              {status === 'complete' || status === 'legacy-complete' ? (
+                              {isFinished(status) ? (
                                 <Check size={20} className="green" />
                               ) : (
                                 <ArrowUpRight size={18} />
@@ -1885,49 +1880,36 @@ export default function TrainingApp({ user }: { user: User }) {
                       <div className="run-row" key={r.key}>
                         <span>{dateLabel(r.actualDate)}</span>
                         <strong>{r.value} mi</strong>
-                        <span>{formatTime(r.seconds)}</span>
-                        <span>{formatTime(r.seconds / r.value)} /mi</span>
+                        <span>{r.seconds ? formatTime(r.seconds) : '—'}</span>
+                        <span>{r.seconds ? `${formatTime(r.seconds / r.value)} /mi` : '—'}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <p className="empty-line">
-                    The miles you actually run will show up here, with time and pace.
+                    Tick a run to log its miles. Add its time under Log results to see your pace.
                   </p>
                 )}
               </section>
               <section className="recent-history">
                 <div className="section-heading">
-                  <h2>Recent sessions</h2>
+                  <h2>Recent workouts</h2>
                   <CalendarDays size={20} />
                 </div>
-                {days
-                  .filter((d) => latest(map, `session:${d.date}`))
-                  .sort((a, b) =>
-                    (latest(map, `session:${b.date}`)?.actualDate || b.date).localeCompare(
-                      latest(map, `session:${a.date}`)?.actualDate || a.date,
-                    ),
-                  )
-                  .slice(0, 10)
-                  .map((d) => (
-                    <button className="history-row" key={d.date} onClick={() => chooseDay(d.date)}>
-                      <Dumbbell size={18} />
-                      <strong>{d.title}</strong>
-                      <span>
-                        {latest(map, `session:${d.date}`).actualDate
-                          ? dateLabel(latest(map, `session:${d.date}`).actualDate)
-                          : 'Training date not recorded'}
-                      </span>
-                      <b>
-                        {latest(map, `session:${d.date}`).status.replace(
-                          'legacy-complete',
-                          'Imported',
-                        )}
-                      </b>
-                      <ArrowUpRight size={16} />
-                    </button>
-                  ))}
-                {!days.some((d) => latest(map, `session:${d.date}`)) && (
+                {recentWorkouts.map(({ day: d, status }) => (
+                  <button className="history-row" key={d.date} onClick={() => chooseDay(d.date)}>
+                    <Dumbbell size={18} />
+                    <strong>{d.title}</strong>
+                    <span>
+                      {status.actualDate
+                        ? dateLabel(status.actualDate)
+                        : 'Training date not recorded'}
+                    </span>
+                    <b>{status.label}</b>
+                    <ArrowUpRight size={16} />
+                  </button>
+                ))}
+                {!recentWorkouts.length && (
                   <p className="empty-line">
                     Your completed and partial workouts will live here. Older results can be entered
                     by opening their date in Schedule.
@@ -2051,7 +2033,7 @@ export default function TrainingApp({ user }: { user: User }) {
               settings
                 ? 'Settings and backup'
                 : modal === 'finish'
-                  ? 'Finish workout'
+                  ? 'Finish early'
                   : modal === 'timer'
                     ? 'Custom timer'
                     : 'Reschedule workout'
@@ -2226,13 +2208,12 @@ export default function TrainingApp({ user }: { user: User }) {
               </>
             ) : modal === 'finish' ? (
               <>
-                <span className="eyebrow">ONE MORE STEP FORWARD</span>
-                <h2>{percent === 100 ? 'Put it in the books.' : 'Save today’s effort.'}</h2>
+                <span className="eyebrow">END THIS WORKOUT</span>
+                <h2>Finish early.</h2>
                 <p className="modal-description">
-                  {doneKeys.length} of {allSetKeys.length} sets and checkpoints completed.{' '}
-                  {percent < 100
-                    ? 'Unfinished sets will be marked skipped, and this session will be saved as partial.'
-                    : 'Every prescribed set and checkpoint is marked complete. Result logging is optional.'}
+                  {doneKeys.length} of {allSetKeys.length} sets ticked. Unticked sets are marked
+                  skipped and the workout is saved as partial. Ticking every set later still
+                  completes it.
                 </p>
                 <label className="field-label">
                   When did you actually train?
@@ -2245,12 +2226,12 @@ export default function TrainingApp({ user }: { user: User }) {
                   />
                 </label>
                 <p className="settings-help">
-                  Scheduled for {dateLabel(due(day))}. Late sessions remain in your activity, but
-                  don’t turn a missed training day into an on-time completion.
+                  Scheduled for {dateLabel(due(day))}. A workout finished after its deadline still
+                  counts as activity, just not as on time.
                 </p>
-                <button className="primary modal-primary" onClick={finish}>
+                <button className="primary modal-primary" onClick={finishEarly}>
                   <CheckCheck size={18} />
-                  {percent === 100 ? 'Save completed workout' : 'Save partial workout'}
+                  Save partial workout
                 </button>
               </>
             ) : (
@@ -2375,6 +2356,7 @@ function ExerciseLogger({
   const [details, setDetails] = useState(false);
   const [advance, setAdvance] = useState(false);
   const [nextVariation, setNextVariation] = useState('');
+  const [prompt, setPrompt] = useState<number | null>(null);
   const prior = previous(e, variation, assistance);
   const recorded = Array.from({ length: e.count }, (_, i) => latest(map, setKey(day.date, e, i)));
   const completed = Array.from({ length: e.count }, (_, i) =>
@@ -2440,7 +2422,14 @@ function ExerciseLogger({
                 role="checkbox"
                 aria-checked={completed[i]}
                 aria-label={`${e.name} set ${i + 1} completed`}
-                onClick={() => onToggle(i)}
+                onClick={() =>
+                  !completed[i] &&
+                  e.unit !== 'check' &&
+                  fixedTarget(e) === null &&
+                  !(result && !result.skipped)
+                    ? setPrompt(i)
+                    : onToggle(i)
+                }
               >
                 <span className="checkbox">{completed[i] && <Check size={16} />}</span>
                 <strong>Set {i + 1}</strong>
@@ -2469,6 +2458,30 @@ function ExerciseLogger({
           );
         })}
       </div>
+      {prompt !== null && (
+        <NumberPrompt
+          key={prompt}
+          exercise={{ ...e, sides }}
+          index={prompt}
+          initial={String(prior?.value ?? e.target.split('-')[0])}
+          onSave={(value, right) => {
+            onSave(prompt, {
+              value,
+              ...(sides ? { right } : {}),
+              sides,
+              clean: false,
+              variation: variation.trim() || currentVariation(map, e),
+              assistance: assistance.trim(),
+            });
+            setPrompt(null);
+          }}
+          onSkip={() => {
+            onToggle(prompt);
+            setPrompt(null);
+          }}
+          onCancel={() => setPrompt(null)}
+        />
+      )}
       <button
         className="optional-log-toggle"
         aria-expanded={logging}
@@ -2669,7 +2682,8 @@ function ResultRow({
   const log = () => {
     const v = Number(value),
       r = Number(right),
-      s = Number(minutes) * 60 + Number(seconds);
+      s = Number(minutes) * 60 + Number(seconds),
+      timed = Boolean(minutes.trim() || seconds.trim());
     if (
       !value.trim() ||
       !Number.isFinite(v) ||
@@ -2679,15 +2693,14 @@ function ResultRow({
       (e.unit === 'reps' && (!Number.isInteger(v) || (e.sides && !Number.isInteger(r)))) ||
       (e.unit === 'run' &&
         (!(v > 0) ||
-          !Number.isFinite(s) ||
-          !(s > 0) ||
-          Number(seconds) >= 60 ||
-          Number(seconds) < 0 ||
-          Number(minutes) < 0))
+          (timed &&
+            (!Number.isFinite(s) ||
+              !(s > 0) ||
+              Number(seconds) >= 60 ||
+              Number(seconds) < 0 ||
+              Number(minutes) < 0))))
     ) {
-      notify(
-        'Enter valid actual results. Runs need a positive distance and time; reps must be whole numbers.',
-      );
+      notify('Enter valid results. Runs need a positive distance; reps must be whole numbers.');
       return;
     }
     if (!variation.trim()) {
@@ -2697,7 +2710,7 @@ function ResultRow({
     onSave({
       value: v,
       ...(e.sides ? { right: r } : {}),
-      ...(e.unit === 'run' ? { seconds: s } : {}),
+      ...(e.unit === 'run' && timed ? { seconds: s } : {}),
       clean: technique,
       variation: variation.trim(),
       assistance: assistance.trim(),
@@ -2712,7 +2725,9 @@ function ResultRow({
           {result.value}
           {e.sides ? ` / ${result.right}` : ''}
           <small>
-            {e.unit === 'run' ? `mi · ${formatTime(result.seconds)}` : e.unit}
+            {e.unit === 'run'
+              ? `mi${result.seconds ? ` · ${formatTime(result.seconds)}` : ''}`
+              : e.unit}
             {result.clean ? ' · clean' : ''}
           </small>
         </span>
@@ -2785,5 +2800,83 @@ function ResultRow({
         )}
       </div>
     </div>
+  );
+}
+
+function NumberPrompt({
+  exercise: e,
+  index,
+  initial,
+  onSave,
+  onSkip,
+  onCancel,
+}: {
+  exercise: Exercise;
+  index: number;
+  initial: string;
+  onSave: (value: number, right: number) => void;
+  onSkip: () => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const [right, setRight] = useState(initial);
+  const valid = (raw: string) =>
+    raw.trim() !== '' &&
+    Number.isFinite(Number(raw)) &&
+    Number(raw) >= 0 &&
+    Number(raw) <= 100000 &&
+    (e.unit !== 'reps' || Number.isInteger(Number(raw)));
+  const ready = valid(value) && (!e.sides || valid(right));
+  return (
+    <form
+      className="number-prompt"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (ready) onSave(Number(value), Number(right));
+      }}
+    >
+      <label>
+        Set {index + 1}: how many {unitLabel(e.unit)}
+        {e.sides ? ' on each side' : ''}?
+        <span className="number-prompt-inputs">
+          <input
+            autoFocus
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step={e.unit === 'reps' ? '1' : '0.1'}
+            aria-label={e.sides ? `Left ${unitLabel(e.unit)}` : unitLabel(e.unit)}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+          />
+          {e.sides && (
+            <>
+              <span>/</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step={e.unit === 'reps' ? '1' : '0.1'}
+                aria-label={`Right ${unitLabel(e.unit)}`}
+                value={right}
+                onChange={(event) => setRight(event.target.value)}
+              />
+            </>
+          )}
+        </span>
+      </label>
+      <div className="number-prompt-actions">
+        <button className="primary" type="submit" disabled={!ready}>
+          <Check size={15} />
+          Save
+        </button>
+        <button type="button" className="secondary" onClick={onSkip}>
+          Tick without a number
+        </button>
+        <button type="button" className="text-link" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }

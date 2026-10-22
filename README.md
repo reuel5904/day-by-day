@@ -23,9 +23,9 @@ Signed-out history and each account's cached history use separate browser storag
 - Individual completion checkboxes and Check all for exercises, sections, or the whole workout, with Undo.
 - Choose Classic beep, Soft chime, Bell, or Digital pulse in the timer or Settings & backup; test the selected alarm and keep your choice in this browser.
 - Rest presets of 30, 45, 60, 90, and 120 seconds, plus custom minutes and seconds, pause/reset/add-time, and a repeating alarm with Stop alarm.
-- Progress shows checked sets, active training days, weekly completed/planned workouts, strength/running totals, and clearly marked Sunday recovery. Checkmarks update activity stats immediately; measurements remain optional and never inferred from targets.
+- Progress shows completed workouts, checked sets, active training days, weekly completed/planned workouts, strength/running totals and rest days. A workout is complete as soon as every exercise set is ticked; warm-ups and cool-downs are optional, and Finish early saves a partial workout.
 - Schedule, session notes, rescheduling, weekly completion, rest-aware streaks, exercise history, comparable personal bests, and running time/distance/pace.
-- Numerical results remain separate from completion: checking sets never invents reps, times, or personal bests.
+- Ticking a fixed-target set records its number (3×20s records 20 seconds per set; a run records its planned distance). Ranges and max tests ask for the number when ticked, and unticking removes only numbers that ticking recorded (ADR-0007).
 - Offline reopening after an online visit. Keep the page open and interact once for timer audio; locked-screen alerts are not guaranteed.
 
 Workouts imported from the original app keep their checkmarks and notes as imported completions, with no assumed training date, set results or streak credit.

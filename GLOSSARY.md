@@ -37,18 +37,18 @@ The date a workout is currently due: its original date, or the date it was last 
 _Avoid_: Planned date, revised scheduled date, actual training date
 
 **Actual training date**:
-The date a workout was actually performed, which may differ from its scheduled date.
+The date a workout was actually performed. For a completed workout it is the day its last set was ticked, which may differ from its scheduled date.
 _Avoid_: Scheduled date
 
 **Missed workout**:
-A workout whose scheduled date has passed without a full completion.
+A workout whose scheduled date has passed without it being completed.
 
 **Deadline**:
-The date by which a workout must be fully completed to count as on time. It is the workout's scheduled date until the workout is missed; after that it stays at the first scheduled date it missed, however often it is moved.
+The date by which a workout must be completed to count as on time. It is the workout's scheduled date until the workout is missed; after that it stays at the first scheduled date it missed, however often it is moved.
 _Avoid_: Original date
 
 **On-time completion**:
-A fully completed workout whose actual training date is on or before its deadline.
+A completed workout whose actual training date is on or before its deadline.
 _Avoid_: Any recorded activity, partial workout
 
 **Training streak**:
@@ -62,11 +62,15 @@ _Avoid_: Performance, daily workout streak
 ### Completion
 
 **Set completion**:
-A confirmation that a prescribed set was performed. It can be recorded without a measured repetition count, duration, or distance.
+A confirmation that a prescribed set was performed. A set with a range or a max test can be completed without a number.
 _Avoid_: Set result, prescribed target
 
+**Completed workout**:
+A workout with every exercise set ticked. Warm-up, cool-down and mobility items are optional.
+_Avoid_: Finished workout
+
 **Partial workout**:
-A finished workout with one or more prescribed sets left unfinished or skipped.
+A started workout that was finished early, or not completed by its scheduled date.
 _Avoid_: Partial session, completed workout
 
 **Imported completion**:
@@ -98,7 +102,7 @@ Measured training results, such as repetitions, hold duration, or exercise diffi
 _Avoid_: Consistency, completion count
 
 **Set result**:
-The actual repetitions or hold duration recorded for an individual set, including the exercise variation, assistance, and side when relevant.
+The repetitions or hold duration recorded for an individual set, including the exercise variation, assistance, and side when relevant: the prescribed number when a fixed-target set is ticked, otherwise the number entered.
 _Avoid_: Prescribed target, exercise checkbox
 
 **Run result**:

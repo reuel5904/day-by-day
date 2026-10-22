@@ -23,6 +23,9 @@ const {
   completionChanges,
   completionKey,
   isSetComplete,
+  setKey,
+  untickChanges,
+  workoutStatus,
 } = await import('../.work/pages-test/training-model.mjs');
 const { EXERCISES } = await import('../.work/pages-test/exercises.mjs');
 let count = 0;
@@ -38,6 +41,36 @@ const event = (id, entity, data, parents = []) => ({
   parents,
   at: '2026-10-19T12:00:00.000Z',
 });
+const requiredSets = (date) =>
+  days
+    .find((d) => d.date === date)
+    .sections.filter((s) => s.kind !== 'prep')
+    .flatMap((s) =>
+      s.exercises.flatMap((e) => Array.from({ length: e.count }, (_, i) => `${e.id}:${i}`)),
+    );
+const tick = (date, sets, actualDate = date) =>
+  sets.map((set) =>
+    event(`tick-${date}-${set}`, `completion:${date}:${set}`, {
+      completed: true,
+      day: date,
+      actualDate,
+    }),
+  );
+const exerciseOf = (date, id) =>
+  days
+    .find((d) => d.date === date)
+    .sections.flatMap((s) => s.exercises)
+    .find((e) => e.id === id);
+let changeId = 0;
+const changeEvents = (changes, map = {}) =>
+  changes.map((c) =>
+    event(
+      'change' + changeId++,
+      c.entity,
+      c.data,
+      (map[c.entity] || []).map((e) => e.id),
+    ),
+  );
 const sectionWith = (text) => days.flatMap((d) => d.sections).find((s) => s.text.startsWith(text));
 // What the original text parser produced for every workout up to Oct 22, as
 // "sectionExerciseId:sets:unit". Saved results are keyed by these IDs, so they must not change.
@@ -142,6 +175,26 @@ test('Progression suggestions apply only to W1-W7 rep ranges, never to pull-ups 
         assert.doesNotMatch(e.name, /Pull-Ups|Chin-Ups/);
       }
 });
+test('A workout is complete once every exercise set is ticked; warm-ups are optional', () => {
+  const d = days.find((d) => d.date === '2026-10-19');
+  const status = workoutStatus(d, heads(tick(d.date, requiredSets(d.date))), '2026-10-19');
+  assert.equal(status.id, 'complete');
+  assert.equal(status.actualDate, '2026-10-19');
+});
+test('A started workout becomes partial once its scheduled date passes', () => {
+  const d = days.find((d) => d.date === '2026-10-19');
+  const map = heads(tick(d.date, requiredSets(d.date).slice(0, 3)));
+  assert.equal(workoutStatus(d, map, '2026-10-19').id, 'started');
+  assert.equal(workoutStatus(d, map, '2026-10-20').id, 'partial');
+  assert.equal(workoutStatus(d, {}, '2026-10-20').id, 'empty');
+});
+test('A workout finished on a later day is complete but not on time', () => {
+  const d = days.find((d) => d.date === '2026-10-19');
+  const [first, ...rest] = requiredSets(d.date);
+  const map = heads([...tick(d.date, [first]), ...tick(d.date, rest, '2026-10-20')]);
+  assert.equal(workoutStatus(d, map, '2026-10-21').actualDate, '2026-10-20');
+  assert.equal(onTime(d, map), false);
+});
 test('Concurrent offline edits remain conflicts until explicitly resolved', () => {
   const root = event('a', 'notes:2026-10-19', { text: 'old' });
   const left = event('b', root.entity, { text: 'left' }, ['a']);
@@ -155,31 +208,21 @@ test('Concurrent offline edits remain conflicts until explicitly resolved', () =
   assert.equal(latest(heads([...all, resolved]), root.entity).text, 'selected');
 });
 test('Scheduled rest preserves a streak without a check-in; today is not prematurely missed', () => {
-  const events = ['2026-10-16', '2026-10-17'].map((d, i) =>
-    event('e' + i, 'session:' + d, { status: 'complete', actualDate: d }),
-  );
+  const events = ['2026-10-16', '2026-10-17'].flatMap((d) => tick(d, requiredSets(d)));
   assert.deepEqual(streaks(heads(events), '2026-10-19'), { current: 2, best: 2 });
   assert.equal(streaks(heads(events), '2026-10-20').current, 0);
 });
 test('Partial and late workouts are activity, not on-time completion', () => {
   const d = days.find((d) => d.date === '2026-10-19');
-  assert.equal(
-    onTime(d, heads([event('p', 'session:' + d.date, { status: 'partial', actualDate: d.date })])),
-    false,
-  );
-  assert.equal(
-    onTime(
-      d,
-      heads([event('l', 'session:' + d.date, { status: 'complete', actualDate: '2026-10-20' })]),
-    ),
-    false,
-  );
+  const partial = event('p', 'session:' + d.date, { status: 'partial', actualDate: d.date });
+  assert.equal(onTime(d, heads([...tick(d.date, requiredSets(d.date).slice(1)), partial])), false);
+  assert.equal(onTime(d, heads(tick(d.date, requiredSets(d.date), '2026-10-20'))), false);
 });
 test('Moving an already-missed workout does not erase its original deadline', () => {
   const d = days.find((d) => d.date === '2026-10-19');
   const events = [
     event('m', 'schedule:' + d.date, { due: '2026-10-21', originalDate: d.date, lateMove: true }),
-    event('s', 'session:' + d.date, { status: 'complete', actualDate: '2026-10-21' }),
+    ...tick(d.date, requiredSets(d.date), '2026-10-21'),
   ];
   assert.equal(onTime(d, heads(events)), false);
 });
@@ -196,10 +239,10 @@ test('Moving a workout again before its scheduled date passes keeps it on time',
     moveWorkout(d, heads([first]), '2026-10-22', '2026-10-24'),
     [first.id],
   );
-  const done = event('done', 'session:' + d.date, { status: 'complete', actualDate: '2026-10-24' });
+  const done = tick(d.date, requiredSets(d.date), '2026-10-24');
   assert.equal(second.data.lateMove, false);
   assert.equal(deadline(d, heads([first, second])), '2026-10-24');
-  assert.equal(onTime(d, heads([first, second, done])), true);
+  assert.equal(onTime(d, heads([first, second, ...done])), true);
 });
 test('A workout missed twice keeps the first scheduled date it missed as its deadline', () => {
   const d = days.find((d) => d.date === '2026-10-21');
@@ -233,15 +276,68 @@ test('Reject malformed imported results and unsafe entity names', () => {
   );
   assert.equal(validateEvents([event('bad', 'notes:2026-10-19', { text: 23 })]), false);
 });
-test('Check all records completion without inventing reps or times', () => {
-  const keys = ['set:2026-10-19:b1e0:0', 'set:2026-10-19:b1e0:1'];
-  const changes = completionChanges({}, keys, '2026-10-19', '2026-10-19');
-  const events = changes.map((c, i) => event('complete' + i, c.entity, c.data));
+test('Ticking a fixed-target set records that target as its result', () => {
+  const hold = exerciseOf('2026-10-13', 'b2e0');
+  const key = setKey('2026-10-13', hold, 0);
+  const events = changeEvents(
+    completionChanges({}, [{ key, exercise: hold }], '2026-10-13', '2026-10-13'),
+  );
   assert.equal(validateEvents(events), true);
   const map = heads(events);
-  assert.ok(keys.every((k) => isSetComplete(map, k)));
-  assert.deepEqual(resultEntries(map), []);
-  assert.ok(changes.every((c) => !('value' in c.data)));
+  assert.equal(isSetComplete(map, key), true);
+  const [result] = resultEntries(map);
+  assert.equal(result.value, 20);
+  assert.equal(result.unit, 'sec');
+  assert.equal(result.variation, 'tucked');
+  assert.equal(result.asPrescribed, true);
+});
+test('Ticking a range or a max test records completion without a number', () => {
+  for (const [date, id] of [
+    ['2026-11-02', 'b2e0'],
+    ['2027-01-08', 'b4e0'],
+  ]) {
+    const e = exerciseOf(date, id);
+    const key = setKey(date, e, 0);
+    const map = heads(changeEvents(completionChanges({}, [{ key, exercise: e }], date, date)));
+    assert.equal(isSetComplete(map, key), true);
+    assert.deepEqual(resultEntries(map), []);
+  }
+});
+test('Ticking a run records its planned distance without a time', () => {
+  const run = exerciseOf('2026-10-13', 'b1e0');
+  const key = setKey('2026-10-13', run, 0);
+  const events = changeEvents(
+    completionChanges({}, [{ key, exercise: run }], '2026-10-13', '2026-10-13'),
+  );
+  assert.equal(validateEvents(events), true);
+  const [result] = resultEntries(heads(events));
+  assert.equal(result.value, 1);
+  assert.equal(result.seconds, undefined);
+});
+test('Unticking removes a number that ticking recorded but keeps one you entered', () => {
+  const hold = exerciseOf('2026-10-13', 'b2e0');
+  const key = setKey('2026-10-13', hold, 0);
+  const untick = (events) => {
+    const map = heads(events);
+    return [...events, ...changeEvents(untickChanges(map, key, '2026-10-13', '2026-10-13'), map)];
+  };
+  const ticked = changeEvents(
+    completionChanges({}, [{ key, exercise: hold }], '2026-10-13', '2026-10-13'),
+  );
+  const afterTick = heads(untick(ticked));
+  assert.equal(isSetComplete(afterTick, key), false);
+  assert.deepEqual(resultEntries(afterTick), []);
+  const entered = event('entered', key, {
+    value: 25,
+    unit: 'sec',
+    name: 'Hollow Hold',
+    variation: 'tucked',
+    assistance: '',
+    sides: false,
+    day: '2026-10-13',
+    actualDate: '2026-10-13',
+  });
+  assert.equal(resultEntries(heads(untick([entered])))[0].value, 25);
 });
 test('Bulk completion only changes the requested incomplete sets', () => {
   const numeric = event('numeric', 'set:2026-10-19:b1e0:0', {
@@ -255,14 +351,17 @@ test('Bulk completion only changes the requested incomplete sets', () => {
     actualDate: '2026-10-19',
   });
   const map = heads([numeric]);
+  const pullUps = exerciseOf('2026-10-19', 'b1e0');
   const changes = completionChanges(
     map,
-    [numeric.entity, 'set:2026-10-19:b1e0:1'],
+    [0, 1].map((i) => ({ key: setKey('2026-10-19', pullUps, i), exercise: pullUps })),
     '2026-10-19',
     '2026-10-19',
   );
-  assert.equal(changes.length, 1);
-  assert.equal(changes[0].entity, 'completion:2026-10-19:b1e0:1');
+  assert.deepEqual(
+    changes.map((c) => c.entity),
+    ['completion:2026-10-19:b1e0:1', 'set:2026-10-19:b1e0:1'],
+  );
   assert.equal(latest(map, numeric.entity).value, 3);
 });
 test('Unchecking a completion preserves recorded performance', () => {
@@ -289,7 +388,11 @@ test('Unchecking a completion preserves recorded performance', () => {
 test('Bulk completion cannot silently resolve a conflicting measurement', () => {
   const key = 'set:2026-10-19:b1e0:0';
   const map = heads([event('left', key, { value: 2 }), event('right', key, { value: 3 })]);
-  assert.equal(completionChanges(map, [key], '2026-10-19', '2026-10-19').length, 0);
+  const pullUps = exerciseOf('2026-10-19', 'b1e0');
+  assert.equal(
+    completionChanges(map, [{ key, exercise: pullUps }], '2026-10-19', '2026-10-19').length,
+    0,
+  );
   assert.equal(isSetComplete(map, key), false);
 });
 test('Undoing a bulk check restores the prior explicit incomplete state', () => {

@@ -1,0 +1,3 @@
+# Ticking a fixed-target set records its number
+
+Ticking a set whose prescription is a single number ("3×20s", "4×2", "Run: 2 mi") records that number as its set or run result, marked as prescribed, instead of recording completion alone as ADR-0003 required. With completion-only ticks, almost every performance stat stayed empty unless numbers were typed into a hidden panel, and ticking a fixed-target set already confirms that exact number was done. Sets with a range or a max test still get no number unless one is entered, so the app asks for it when they are ticked; unticking removes a number that ticking recorded but keeps one that was entered; and a run's time stays optional because only pace needs it.

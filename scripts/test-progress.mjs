@@ -1,21 +1,16 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 await build({
-  entryPoints: ['web/src/progress-model.ts'],
+  entryPoints: ['web/src/progress-model.ts', 'web/src/training-model.ts'],
   bundle: true,
   platform: 'node',
   format: 'esm',
-  outfile: '.work/progress-test.mjs',
+  outdir: '.work/progress-test',
+  outExtension: { '.js': '.mjs' },
 });
-await build({
-  entryPoints: ['web/src/training-model.ts'],
-  bundle: true,
-  platform: 'node',
-  format: 'esm',
-  outfile: '.work/progress-training.mjs',
-});
-const { progressSummary, trainingStatus, calendarDay } = await import('../.work/progress-test.mjs');
-const { days, heads } = await import('../.work/progress-training.mjs');
+const { progressSummary, calendarDay } = await import('../.work/progress-test/progress-model.mjs');
+const { days, heads, completionChanges, setKey, streaks, workoutStatus } =
+  await import('../.work/progress-test/training-model.mjs');
 const event = (id, entity, data, parents = []) => ({
   id,
   entity,
@@ -29,31 +24,54 @@ const test = (name, fn) => {
   count++;
   console.log('✓ ' + name);
 };
-const monday = days.find((day) => day.date === '2026-10-19');
+const dayOf = (date) => days.find((day) => day.date === date);
+// What ticking every box of a workout writes, through the same rules the app uses.
+const tickAll = (date, actualDate = date) =>
+  completionChanges(
+    {},
+    dayOf(date).sections.flatMap((s) =>
+      s.exercises.flatMap((e) =>
+        Array.from({ length: e.count }, (_, i) => ({ key: setKey(date, e, i), exercise: e })),
+      ),
+    ),
+    date,
+    actualDate,
+  ).map((c, i) => event(`${date}-${i}`, c.entity, c.data));
+const monday = dayOf('2026-10-19');
 const completion = event('set', 'completion:2026-10-19:b1e0:0', {
   completed: true,
   day: monday.date,
   actualDate: monday.date,
 });
-test('Sunday is explicitly planned rest without a check-in or workout credit', () => {
-  const rest = days.find((day) => day.date === '2026-10-18');
-  assert.deepEqual(trainingStatus(rest, {}, '2026-10-19'), { id: 'rest', label: 'Planned rest' });
+test('Ticking every box of three workouts fills the workout stats without pressing Finish', () => {
+  const map = heads(['2026-10-19', '2026-10-20', '2026-10-21'].flatMap((date) => tickAll(date)));
+  const summary = progressSummary(map, '2026-10-22');
+  assert.equal(summary.completed, 3);
+  assert.equal(summary.thisWeek.completed, 3);
+  assert.equal(summary.thisWeek.planned, 6);
+  assert.equal(summary.strength, 2);
+  assert.equal(summary.runs, 1);
+  assert.equal(summary.distance, 1.5);
+  assert.ok(summary.measurements > 0);
+  assert.deepEqual(streaks(map, '2026-10-22'), { current: 3, best: 3 });
+});
+test('Sunday is a rest day without a check-in or workout credit', () => {
+  const rest = dayOf('2026-10-18');
+  assert.equal(workoutStatus(rest, {}, '2026-10-19').id, 'rest');
   const summary = progressSummary({}, '2026-10-19');
   assert.equal(summary.restDays, 1);
   assert.equal(summary.completed, 0);
   assert.equal(summary.activeDays, 0);
   assert.equal(summary.thisWeek.planned, 6);
 });
-test('Checkbox-only progress produces stats before Finish without inventing measurements', () => {
+test('One ticked set counts as activity while the workout is in progress', () => {
   const map = heads([completion]),
     summary = progressSummary(map, '2026-10-19');
   assert.equal(summary.sets, 1);
   assert.equal(summary.activeDays, 1);
   assert.equal(summary.inProgress, 1);
   assert.equal(summary.completed, 0);
-  assert.equal(summary.measurements, 0);
-  assert.equal(summary.distance, 0);
-  assert.equal(trainingStatus(monday, map, '2026-10-19').id, 'started');
+  assert.equal(workoutStatus(monday, map, '2026-10-19').id, 'started');
 });
 test('Unchecking removes set credit while retaining an explicitly recorded result', () => {
   const result = event('result', 'set:2026-10-19:b1e0:0', {
@@ -70,7 +88,7 @@ test('Unchecking removes set credit while retaining an explicitly recorded resul
   assert.equal(summary.activeDays, 1);
   assert.equal(summary.measurements, 1);
 });
-test('Warm-up and run checkboxes count activity but never strength sets or assumed miles', () => {
+test('Warm-up and run boxes count as activity but not as strength sets', () => {
   const warmup = event('warmup', 'completion:2026-10-19:b0e0:0', {
     completed: true,
     day: monday.date,
@@ -83,7 +101,6 @@ test('Warm-up and run checkboxes count activity but never strength sets or assum
   });
   const summary = progressSummary(heads([warmup, run]), '2026-10-19');
   assert.equal(summary.sets, 0);
-  assert.equal(summary.distance, 0);
   assert.equal(summary.activeDays, 1);
 });
 test('Imported completion counts workouts but cannot invent training dates or completed sets', () => {
@@ -96,17 +113,13 @@ test('Imported completion counts workouts but cannot invent training dates or co
   assert.equal(summary.sets, 0);
   assert.equal(summary.measurements, 0);
 });
-test('Weekly totals use revised planned dates and exclude rest; actual days are deduplicated', () => {
-  const session = event('session', 'session:2026-10-19', {
-    status: 'complete',
-    actualDate: '2026-10-19',
-  });
+test('Weekly totals use revised scheduled dates and exclude rest; actual days are deduplicated', () => {
   const moved = event('moved', 'schedule:2026-10-19', {
     due: '2026-10-18',
     originalDate: '2026-10-19',
     lateMove: false,
   });
-  const summary = progressSummary(heads([completion, session, moved]), '2026-10-19');
+  const summary = progressSummary(heads([...tickAll('2026-10-19'), moved]), '2026-10-19');
   assert.equal(summary.activeDays, 1);
   assert.equal(summary.completed, 1);
   assert.equal(summary.strength, 1);
@@ -114,7 +127,7 @@ test('Weekly totals use revised planned dates and exclude rest; actual days are 
   assert.equal(summary.thisWeek.planned, 5);
   assert.equal(summary.thisWeek.completed, 0);
 });
-test('Partial sessions and conflicting set edits do not earn completed workout credit', () => {
+test('Partial workouts and conflicting set edits do not earn completed workout credit', () => {
   const conflict = event('other', completion.entity, { ...completion.data, completed: false });
   const partial = event('partial', 'session:2026-10-19', {
     status: 'partial',
@@ -126,8 +139,8 @@ test('Partial sessions and conflicting set edits do not earn completed workout c
   assert.equal(summary.sets, 0);
 });
 test('Unrecorded future workouts are upcoming rather than missed', () => {
-  assert.equal(trainingStatus(monday, {}, '2026-10-18').id, 'upcoming');
-  assert.equal(trainingStatus(monday, {}, '2026-10-20').id, 'empty');
+  assert.equal(workoutStatus(monday, {}, '2026-10-18').id, 'upcoming');
+  assert.equal(workoutStatus(monday, {}, '2026-10-20').id, 'empty');
 });
 test('A workout moved onto Sunday remains visible and mixed completion is explicit', () => {
   const move = event('move', 'schedule:2026-10-19', {
@@ -143,11 +156,8 @@ test('A workout moved onto Sunday remains visible and mixed completion is explic
     originalDate: '2026-10-20',
     lateMove: false,
   });
-  const finished = event('finished', 'session:2026-10-19', {
-    status: 'complete',
-    actualDate: '2026-10-18',
-  });
-  const mixed = calendarDay('2026-10-18', heads([move, move2, finished]), '2026-10-19');
+  const finished = tickAll('2026-10-19', '2026-10-18');
+  const mixed = calendarDay('2026-10-18', heads([move, move2, ...finished]), '2026-10-19');
   assert.equal(mixed.status.id, 'partial');
   assert.equal(mixed.status.label, '1 of 2 workouts complete');
   assert.equal(mixed.target.date, '2026-10-20');

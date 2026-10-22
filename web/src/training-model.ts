@@ -136,20 +136,64 @@ export function isSetComplete(map: Record<string, Event[]>, key: string): boolea
   const result = latest(map, key);
   return Boolean(result && !result.skipped);
 }
-export function completionChanges(
+export const fixedTarget = (e: Exercise) =>
+  e.unit !== 'check' && /^\d+(\.\d+)?$/.test(e.target) ? Number(e.target) : null;
+export const currentVariation = (map: Record<string, Event[]>, e: Exercise): string =>
+  latest(map, `stage:${e.name}`)?.variation || e.variation;
+// Ticking a fixed-target set confirms its prescribed number (ADR-0007).
+export function prescribedResult(
   map: Record<string, Event[]>,
-  keys: string[],
+  e: Exercise,
   day: string,
   actualDate: string,
 ) {
-  return keys
-    .filter(
-      (key) =>
-        !isSetComplete(map, key) &&
-        !(map[key]?.length > 1) &&
-        !(map[completionKey(key)]?.length > 1),
-    )
-    .map((key) => ({ entity: completionKey(key), data: { completed: true, day, actualDate } }));
+  const value = fixedTarget(e);
+  if (value === null) return null;
+  return {
+    value,
+    ...(e.sides ? { right: value } : {}),
+    name: e.name,
+    variation: currentVariation(map, e),
+    assistance: '',
+    unit: e.unit,
+    sides: e.sides,
+    tempo: e.tempo,
+    day,
+    actualDate,
+    skipped: false,
+    asPrescribed: true,
+  };
+}
+const conflicted = (map: Record<string, Event[]>, key: string) =>
+  map[key]?.length > 1 || map[completionKey(key)]?.length > 1;
+export function completionChanges(
+  map: Record<string, Event[]>,
+  sets: { key: string; exercise: Exercise }[],
+  day: string,
+  actualDate: string,
+) {
+  return sets
+    .filter(({ key }) => !isSetComplete(map, key) && !conflicted(map, key))
+    .flatMap(({ key, exercise }) => {
+      const existing = latest(map, key);
+      const result =
+        existing && !existing.skipped ? null : prescribedResult(map, exercise, day, actualDate);
+      return [
+        { entity: completionKey(key), data: { completed: true, day, actualDate } },
+        ...(result ? [{ entity: key, data: result }] : []),
+      ];
+    });
+}
+export function untickChanges(
+  map: Record<string, Event[]>,
+  key: string,
+  day: string,
+  actualDate: string,
+) {
+  return [
+    { entity: completionKey(key), data: { completed: false, day, actualDate } },
+    ...(latest(map, key)?.asPrescribed ? [{ entity: key, data: null }] : []),
+  ];
 }
 
 export function heads(events: Event[]) {
@@ -188,9 +232,79 @@ export function moveWorkout(d: Day, map: Record<string, Event[]>, today: string,
     ...(missedDeadline ? { missedDeadline } : {}),
   };
 }
+export const setCount = (day: Day, map: Record<string, Event[]>, e: Exercise) =>
+  latest(map, `config:${day.date}:${e.id}`)?.count || e.count;
+export function workoutSets(day: Day, map: Record<string, Event[]>) {
+  const sets = day.sections.flatMap((section) =>
+    section.exercises.flatMap((exercise) =>
+      Array.from({ length: setCount(day, map, exercise) }, (_, i) => ({
+        key: setKey(day.date, exercise, i),
+        exercise,
+        optional: section.kind === 'prep',
+      })),
+    ),
+  );
+  // A workout made only of warm-up, cool-down or mobility items needs those ticked instead.
+  return sets.some((set) => !set.optional)
+    ? sets
+    : sets.map((set) => ({ ...set, optional: false }));
+}
+const tickDate = (map: Record<string, Event[]>, key: string): string | undefined =>
+  latest(map, completionKey(key))?.actualDate || latest(map, key)?.actualDate;
+// The actual training date of a completed workout: the day its last required set was ticked.
+export function completedOn(day: Day, map: Record<string, Event[]>): string | null {
+  const required = workoutSets(day, map).filter((set) => !set.optional);
+  if (!required.length || !required.every(({ key }) => isSetComplete(map, key))) return null;
+  return (
+    required
+      .map(({ key }) => tickDate(map, key) ?? '')
+      .sort()
+      .at(-1) || null
+  );
+}
+export type WorkoutStatus = {
+  id: 'rest' | 'conflict' | 'legacy' | 'complete' | 'partial' | 'started' | 'empty' | 'upcoming';
+  label: string;
+  actualDate: string | null;
+};
+export function workoutStatus(
+  day: Day,
+  map: Record<string, Event[]>,
+  today: string,
+): WorkoutStatus {
+  if (!day.sections.length) return { id: 'rest', label: 'Rest day', actualDate: null };
+  if (map[`session:${day.date}`]?.length > 1)
+    return { id: 'conflict', label: 'Review conflicting edits', actualDate: null };
+  const session = latest(map, `session:${day.date}`);
+  if (session?.status === 'legacy-complete')
+    return { id: 'legacy', label: 'Imported completion', actualDate: null };
+  const completed = completedOn(day, map);
+  if (completed) return { id: 'complete', label: 'Complete', actualDate: completed };
+  const lastTick =
+    workoutSets(day, map)
+      .filter(({ key }) => isSetComplete(map, key))
+      .map(({ key }) => tickDate(map, key) ?? '')
+      .sort()
+      .at(-1) || null;
+  const scheduled = effectiveDate(day, map);
+  if (session?.status === 'partial')
+    return { id: 'partial', label: 'Partial workout', actualDate: session.actualDate };
+  if (lastTick)
+    return scheduled < today
+      ? { id: 'partial', label: 'Partial workout', actualDate: lastTick }
+      : { id: 'started', label: 'In progress', actualDate: lastTick };
+  if (scheduled < today) return { id: 'empty', label: 'Missed', actualDate: null };
+  return {
+    id: 'upcoming',
+    label: scheduled === today ? 'Planned for today' : 'Upcoming workout',
+    actualDate: null,
+  };
+}
+export const isFinished = (status: WorkoutStatus) =>
+  status.id === 'complete' || status.id === 'legacy';
 export function onTime(d: Day, map: Record<string, Event[]>) {
-  const s = latest(map, `session:${d.date}`);
-  return s?.status === 'complete' && s.actualDate && s.actualDate <= deadline(d, map);
+  const completed = completedOn(d, map);
+  return completed !== null && completed <= deadline(d, map);
 }
 export function streaks(map: Record<string, Event[]>, today: string) {
   const scheduled = days
@@ -241,7 +355,8 @@ export function validEventData(entity: string, data: any): boolean {
         typeof data.sides === 'boolean' &&
         (!data.sides || (Number.isFinite(data.right) && data.right >= 0 && data.right <= 100000)) &&
         (data.unit !== 'run' ||
-          (data.value > 0 && Number.isFinite(data.seconds) && data.seconds > 0)) &&
+          (data.value > 0 &&
+            (data.seconds === undefined || (Number.isFinite(data.seconds) && data.seconds > 0)))) &&
         date(data.day) &&
         date(data.actualDate))
     );
