@@ -54,13 +54,13 @@ npm run dev
 Open `http://127.0.0.1:5174/day-by-day/`. Authored client code is in `web/src/`; `web/index.html` is the Vite entry point. The original `routine.md` and `routine.js` are retained as reference; the deployed app reads `web/src/routine.ts`.
 
 ```sh
+npm run format:check   # npm run format fixes it
+npm run lint
 npm run check
 npm test
 npm run build
 ```
 
-The build writes a static output to `dist/`, then updates the tracked root `index.html`, `assets/`, `favicon.svg`, and `sw.js`. These root files are the deployable artifacts for this repository's existing **main branch / root** Pages source. The `.nojekyll` file bypasses Jekyll. The `/day-by-day/` asset base and service worker scope are configured for this project site.
-
-Commit the source and generated artifacts together, then push to `main`; GitHub Pages publishes them automatically. No Actions token or new hosting credentials are needed. Do not edit generated `assets/` or the root `index.html` directly.
+The build writes the site to `dist/`, which is not committed. Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): it runs the checks above, builds, and deploys `dist/` to GitHub Pages, and nothing deploys if a check fails. The Pages source is set to **GitHub Actions**. The `/day-by-day/` asset base and service worker scope are configured for this project site.
 
 The tests cover routine integrity, set completion, conflict preservation, streak rules, original-history migration, account isolation, retry behavior, concurrent edits, malformed responses, and paginated downloads. `supabase/tests/training_history.sql` verifies real database role access inside a rolled-back transaction, including anonymous denial, cross-account isolation, and immutable retry semantics. See `GLOSSARY.md`, `docs/design.md`, and `docs/adr/` for product behavior and decisions.
