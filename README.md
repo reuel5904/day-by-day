@@ -2,7 +2,7 @@
 
 A personal calisthenics and running planner, published at **https://reuel5904.github.io/day-by-day/**.
 
-Follow the original October 13, 2026–January 10, 2027 program, check off individual sets or whole sections, use audible rest alarms, and track consistency and measured performance.
+Follow a dated training program (the current one runs October 13, 2026–January 10, 2027), tick off sets as you go, rest with an audible timer, and track consistency and measured performance.
 
 ## GitHub Pages version
 
@@ -19,8 +19,12 @@ Changes sync shortly after editing, on focus/reconnection, and every 45 seconds 
 
 Signed-out history and each account's cached history use separate browser storage. Signing out on one browser leaves other devices signed in; any queued changes remain available when that account signs back in. Timer state and sound preferences stay local to each browser. Export JSON through Settings & backup to keep an independent backup.
 
-- Larger, compact workout cards and optional result logging.
-- Individual completion checkboxes and Check all for exercises, sections, or the whole workout, with Undo.
+- Today opens with one row for the workout (title, date, week, sets done and reschedule), then its sets, so the first set is on a phone's first screen.
+- On phones, Today, Schedule and Progress tabs sit at the bottom with the rest timer floating above them.
+- Light and dark themes follow the device setting.
+- The screen and day live in the URL (`#/workout/2026-10-22`, `#/schedule`, `#/progress`), so a refresh keeps your place, the back button works, and a link opens a specific day.
+- After a program's last day, until the next one starts, Today shows its summary: workouts completed out of planned, best streak, personal bests, and the test-week results, with the final dead hang compared with Oct 16.
+- Individual completion checkboxes and Check all for exercises, sections, or the whole workout, with Undo. Sections with a single box have no Check all.
 - Choose Classic beep, Soft chime, Bell, or Digital pulse in the timer or Settings & backup; test the selected alarm and keep your choice in this browser.
 - Rest presets of 30, 45, 60, 90, and 120 seconds, plus custom minutes and seconds, pause/reset/add-time, and a repeating alarm with Stop alarm.
 - Progress shows completed workouts, checked sets, active training days, weekly completed/planned workouts, strength/running totals and rest days. A workout is complete as soon as every exercise set is ticked; warm-ups and cool-downs are optional, and Finish early saves a partial workout.
@@ -49,7 +53,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5174/day-by-day/`. Authored client code is in `web/src/`; `web/index.html` is the Vite entry point. Each program lives in `web/src/programs/<start date>/`: `program.ts` is its structured data and `roadmap.md` the roadmap it was converted from. `web/src/exercises.ts` lists the exercise names every program uses.
+Open `http://127.0.0.1:5174/day-by-day/`. Authored client code is in `web/src/`; `web/index.html` is the Vite entry point. Each program lives in `web/src/programs/<start date>/`: `program.ts` is its structured data and `roadmap.md` the roadmap it was converted from (ADR-0006). `web/src/exercises.ts` lists the exercise names every program uses, so an exercise keeps one history across programs. `CLAUDE.md` has the steps for loading a new program from a roadmap.
 
 ```sh
 npm run format:check   # npm run format fixes it
@@ -61,4 +65,4 @@ npm run build
 
 The build writes the site to `dist/`, which is not committed. Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): it runs the checks above, builds, and deploys `dist/` to GitHub Pages, and nothing deploys if a check fails. The Pages source is set to **GitHub Actions**. The `/day-by-day/` asset base and service worker scope are configured for this project site.
 
-The tests cover routine integrity, set completion, conflict preservation, streak rules, imported-history validation, account isolation, retry behavior, concurrent edits, malformed responses, and paginated downloads. `supabase/tests/training_history.sql` verifies real database role access inside a rolled-back transaction, including anonymous denial, cross-account isolation, and immutable retry semantics. See `GLOSSARY.md`, `docs/design.md`, and `docs/adr/` for product behavior and decisions.
+The tests cover program data integrity, set completion, the program summary, URLs, conflict preservation, streak rules, imported-history validation, account isolation, retry behavior, concurrent edits, malformed responses, and paginated downloads. `supabase/tests/training_history.sql` verifies real database role access inside a rolled-back transaction, including anonymous denial, cross-account isolation, and immutable retry semantics. See `GLOSSARY.md`, `docs/design.md`, and `docs/adr/` for product behavior and decisions.
