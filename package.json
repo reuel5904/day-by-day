@@ -11,6 +11,9 @@
     "build": "vite build && node scripts/publish-static.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 5174",
     "check": "tsc --noEmit",
+    "lint": "eslint web/src",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "node scripts/test-pages.mjs && node scripts/test-sync.mjs && node scripts/test-progress.mjs"
   },
   "dependencies": {
@@ -23,8 +26,12 @@
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@typescript-eslint/parser": "8.71.1",
     "@vitejs/plugin-react": "6.0.2",
     "esbuild": "0.27.4",
+    "eslint": "10.12.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "prettier": "3.9.9",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
     "vite": "8.0.13"

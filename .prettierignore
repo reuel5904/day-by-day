@@ -1,0 +1,6 @@
+*.md
+package-lock.json
+/index.html
+/assets/
+/sw.js
+/favicon.svg
