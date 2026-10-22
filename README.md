@@ -28,7 +28,7 @@ Signed-out history and each account's cached history use separate browser storag
 - Numerical results remain separate from completion: checking sets never invents reps, times, or personal bests.
 - Offline reopening after an online visit. Keep the page open and interact once for timer audio; locked-screen alerts are not guaranteed.
 
-Existing original-app checkmarks and notes are carried over automatically on the same browser and origin. The original `day-by-day-v1` storage is retained untouched. Imported completions have no assumed actual performance date and do not fabricate set measurements or streaks. Extra-long original notes are also retained in the imported legacy record and the untouched original storage key.
+Workouts imported from the original app keep their checkmarks and notes as imported completions, with no assumed training date, set results or streak credit.
 
 ## Supabase setup
 
@@ -40,8 +40,6 @@ Authentication uses Supabase's default email magic link and persistent browser s
 
 Supabase's built-in email service is limited to organization-member email addresses and a low sending rate. This setup is for the owner's personal use. Configure custom SMTP in Supabase before inviting other people. No paid email service or Supabase plan was enabled.
 
-The former separately hosted ChatGPT-sign-in version remains independent. Export/import JSON to bring any history from that version into this app.
-
 ## Development
 
 Node.js 22.13+ is required. Use `npm run dev -- --port 5175 --strictPort` when testing email sign-in locally, matching the allowed redirect URL.
@@ -51,7 +49,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5174/day-by-day/`. Authored client code is in `web/src/`; `web/index.html` is the Vite entry point. The original `routine.md` and `routine.js` are retained as reference; the deployed app reads `web/src/routine.ts`.
+Open `http://127.0.0.1:5174/day-by-day/`. Authored client code is in `web/src/`; `web/index.html` is the Vite entry point. The app reads the program from `web/src/routine.ts`; `routine.md` is the original roadmap it came from.
 
 ```sh
 npm run format:check   # npm run format fixes it
@@ -63,4 +61,4 @@ npm run build
 
 The build writes the site to `dist/`, which is not committed. Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): it runs the checks above, builds, and deploys `dist/` to GitHub Pages, and nothing deploys if a check fails. The Pages source is set to **GitHub Actions**. The `/day-by-day/` asset base and service worker scope are configured for this project site.
 
-The tests cover routine integrity, set completion, conflict preservation, streak rules, original-history migration, account isolation, retry behavior, concurrent edits, malformed responses, and paginated downloads. `supabase/tests/training_history.sql` verifies real database role access inside a rolled-back transaction, including anonymous denial, cross-account isolation, and immutable retry semantics. See `GLOSSARY.md`, `docs/design.md`, and `docs/adr/` for product behavior and decisions.
+The tests cover routine integrity, set completion, conflict preservation, streak rules, imported-history validation, account isolation, retry behavior, concurrent edits, malformed responses, and paginated downloads. `supabase/tests/training_history.sql` verifies real database role access inside a rolled-back transaction, including anonymous denial, cross-account isolation, and immutable retry semantics. See `GLOSSARY.md`, `docs/design.md`, and `docs/adr/` for product behavior and decisions.

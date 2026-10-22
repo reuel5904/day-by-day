@@ -1,4 +1,3 @@
-'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownToLine,
@@ -23,7 +22,6 @@ import {
   ListChecks,
   LoaderCircle,
   Menu,
-  MoreHorizontal,
   Pause,
   Play,
   Plus,
@@ -47,7 +45,6 @@ import {
   dateLabel,
   Day,
   days,
-  deadline,
   effectiveDate,
   Event,
   Exercise,
@@ -57,7 +54,6 @@ import {
   localDate,
   mergeEvents,
   mondayOf,
-  onTime,
   resultEntries,
   setKey,
   streaks,
@@ -113,8 +109,8 @@ export default function TrainingApp({ user }: { user: User }) {
     setViewState(v);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  const [selected, setSelected] = useState('2026-10-19');
-  const [today, setToday] = useState('2026-10-19');
+  const [selected, setSelected] = useState(firstToday);
+  const [today, setToday] = useState(() => localDate());
   const [store, setStore] = useState<Store>({ events: [], pending: [] });
   const storeRef = useRef<Store>(store);
   const [loaded, setLoaded] = useState(false);
@@ -129,7 +125,7 @@ export default function TrainingApp({ user }: { user: User }) {
   const [customSeconds, setCustomSeconds] = useState('30');
   const [customTimerError, setCustomTimerError] = useState('');
   const [actualDate, setActualDate] = useState('');
-  const [loggingDate, setLoggingDate] = useState('2026-10-19');
+  const [loggingDate, setLoggingDate] = useState(() => localDate());
   const [moveDate, setMoveDate] = useState('');
   const [note, setNote] = useState('');
   const [sound, setSound] = useState<AlarmSoundId>('classic');
@@ -191,8 +187,6 @@ export default function TrainingApp({ user }: { user: User }) {
     };
   }, []);
   const map = useMemo(() => heads(store.events), [store.events]);
-  const mapRef = useRef(map);
-  mapRef.current = map;
   const day = days.find((d) => d.date === selected) || days[0];
   const recordedSessionDate = latest(map, `session:${selected}`)?.actualDate;
   useEffect(
@@ -290,8 +284,6 @@ export default function TrainingApp({ user }: { user: User }) {
     }
   }, [user, persist, notify]);
   useEffect(() => {
-    setToday(localDate());
-    setSelected(firstToday());
     try {
       const raw = readStore(localStorage, key);
       storeRef.current = raw;
@@ -396,6 +388,15 @@ export default function TrainingApp({ user }: { user: User }) {
       notify('Sound changed for this visit. Browser storage is unavailable.');
     }
   };
+  const toggleMuted = () => {
+    unlockAudio();
+    setMuted(!muted);
+    try {
+      localStorage.setItem('dbd-muted', String(!muted));
+    } catch {
+      notify('Sound setting changed for this visit. Browser storage is unavailable.');
+    }
+  };
   const silenceAlarm = useCallback(() => {
     for (const osc of alarmNodes.current) {
       try {
@@ -465,7 +466,12 @@ export default function TrainingApp({ user }: { user: User }) {
     }
   }, [remaining, timer.running, timer.end, chime, notify]);
   useEffect(() => {
-    if (loaded) localStorage.setItem('dbd-timer', JSON.stringify(timer));
+    if (!loaded) return;
+    try {
+      localStorage.setItem('dbd-timer', JSON.stringify(timer));
+    } catch {
+      /* The timer keeps running; it just won't survive a reload. */
+    }
   }, [timer, loaded]);
   useEffect(() => {
     if (!started) return;
@@ -799,36 +805,7 @@ export default function TrainingApp({ user }: { user: User }) {
           pending: [...storeRef.current.pending, ...imported.map((e: Event) => e.id)],
         });
         notify(`Imported ${imported.length} records. Conflicting edits are preserved for review.`);
-      } else if (data.version === 1 && data.progress && typeof data.progress === 'object') {
-        const values: { entity: string; data: any }[] = [];
-        for (const d of days) {
-          const old = data.progress[d.date];
-          if (!old || typeof old !== 'object') continue;
-          const checks = Array.isArray(old.checks)
-            ? old.checks.map((v: unknown) => v === true)
-            : [];
-          if (!latest(mapRef.current, `legacy:${d.date}`))
-            values.push({
-              entity: `legacy:${d.date}`,
-              data: { checks, complete: old.complete === true },
-            });
-          if (typeof old.notes === 'string' && !latest(mapRef.current, `notes:${d.date}`))
-            values.push({ entity: `notes:${d.date}`, data: { text: old.notes.slice(0, 10000) } });
-          if (
-            (old.complete === true ||
-              (d.items.length && checks.length === d.items.length && checks.every(Boolean))) &&
-            !latest(mapRef.current, `session:${d.date}`)
-          )
-            values.push({
-              entity: `session:${d.date}`,
-              data: { status: 'legacy-complete', actualDate: null, source: 'v1' },
-            });
-        }
-        writeMany(values);
-        notify(
-          'Original history imported. Checkmarks and notes stay intact; no performance results were invented.',
-        );
-      } else throw new Error('Choose a Day by Day version 1 or version 2 backup.');
+      } else throw new Error('Choose a Day by Day backup file.');
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Could not import this file.');
     }
@@ -1047,11 +1024,7 @@ export default function TrainingApp({ user }: { user: User }) {
             <button
               className="icon-button"
               aria-label={muted ? 'Enable timer sound' : 'Mute timer sound'}
-              onClick={() => {
-                unlockAudio();
-                setMuted(!muted);
-                localStorage.setItem('dbd-muted', String(!muted));
-              }}
+              onClick={toggleMuted}
             >
               {muted ? <VolumeX size={19} /> : <Volume2 size={19} />}
             </button>
@@ -2113,11 +2086,7 @@ export default function TrainingApp({ user }: { user: User }) {
                     role="switch"
                     aria-label="Timer sound"
                     aria-checked={!muted}
-                    onClick={() => {
-                      unlockAudio();
-                      setMuted(!muted);
-                      localStorage.setItem('dbd-muted', String(!muted));
-                    }}
+                    onClick={toggleMuted}
                   >
                     <span />
                   </button>
@@ -2153,9 +2122,8 @@ export default function TrainingApp({ user }: { user: User }) {
                   }}
                 />
                 <p className="settings-help">
-                  Moving from the original app? Export its progress JSON, then import it here.
-                  Existing checkmarks and notes are preserved. Version 2 backups merge records and
-                  preserve conflicting edits.
+                  Importing a backup merges its records with this browser’s and keeps any
+                  conflicting edits for review.
                 </p>
                 <div className="settings-row">
                   <div>

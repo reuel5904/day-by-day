@@ -217,55 +217,19 @@ test('Undoing a bulk check restores the prior explicit incomplete state', () => 
   assert.equal(isSetComplete(heads([before, checked]), key), true);
   assert.equal(isSetComplete(heads([before, checked, undone]), key), false);
 });
-await build({
-  entryPoints: ['web/src/legacy-migration.ts'],
-  bundle: true,
-  platform: 'node',
-  format: 'esm',
-  outfile: '.work/migration-test.mjs',
-});
-const { migrateLegacyHistory } = await import('../.work/migration-test.mjs');
-const storage = (initial = {}) => {
-  const data = new Map(Object.entries(initial));
-  return { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, value) };
-};
-test('Pages automatically carries over original browser history without deleting it', () => {
-  const original = JSON.stringify({
-    '2026-10-19': {
-      checks: [true, true, true, true, true],
-      complete: false,
-      notes: 'Original note',
-    },
-  });
-  const store = storage({ 'day-by-day-v1': original });
-  assert.ok(migrateLegacyHistory(store) > 0);
-  assert.equal(store.getItem('day-by-day-v1'), original);
-  const imported = JSON.parse(store.getItem('day-by-day-v2:local'));
-  assert.equal(validateEvents(imported.events), true);
-  const map = heads(imported.events);
-  assert.equal(latest(map, 'notes:2026-10-19').text, 'Original note');
-  assert.equal(latest(map, 'session:2026-10-19').status, 'legacy-complete');
-  assert.equal(latest(map, 'session:2026-10-19').actualDate, null);
-  assert.deepEqual(resultEntries(map), []);
-});
-test('Migration respects the original checkbox completion rule after a set was unchecked', () => {
-  const store = storage({
-    'day-by-day-v1': JSON.stringify({
-      '2026-10-19': { checks: [true, false, false, false, false], complete: true, notes: '' },
+test('A history with imported completions still validates', () => {
+  const events = [
+    event('legacy-v1-legacy-2026-10-16', 'legacy:2026-10-16', {
+      checks: [true, true],
+      complete: true,
+      originalNotes: '',
     }),
-  });
-  migrateLegacyHistory(store);
-  const map = heads(JSON.parse(store.getItem('day-by-day-v2:local')).events);
-  assert.equal(latest(map, 'session:2026-10-19'), undefined);
-  assert.equal(latest(map, 'legacy:2026-10-19').checks[0], true);
-});
-test('Migration never replaces existing version 2 history', () => {
-  const existing = JSON.stringify({ events: [], pending: [] });
-  const store = storage({
-    'day-by-day-v2:local': existing,
-    'day-by-day-v1': JSON.stringify({ '2026-10-19': { checks: [true] } }),
-  });
-  assert.equal(migrateLegacyHistory(store), 0);
-  assert.equal(store.getItem('day-by-day-v2:local'), existing);
+    event('legacy-v1-session-2026-10-16', 'session:2026-10-16', {
+      status: 'legacy-complete',
+      actualDate: null,
+      source: 'v1',
+    }),
+  ];
+  assert.equal(validateEvents(events), true);
 });
 console.log(`\n${count} domain and data-integrity checks passed.`);
