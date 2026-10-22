@@ -113,6 +113,14 @@ _Avoid_: Planned distance, target pace
 A person's best recorded result for the same exercise variation and measurement conditions.
 _Avoid_: Highest repetition count across all variations
 
+**Test**:
+A set that measures a best effort, such as a pull-up max or a max dead hang. An exercise's test result is its best set in the last week that tests it, compared with the first week that tested it when that came earlier.
+_Avoid_: Assessment, benchmark set
+
+**Program summary**:
+What Today shows after a program's last day until the next program starts: workouts completed out of planned, best streak, personal bests and test results.
+_Avoid_: Program report, recap
+
 **Progression suggestion**:
 A recommendation to advance exercise difficulty based on recorded results and the program's progression rule. An advancement takes effect only after confirmation.
 _Avoid_: Automatic advancement

@@ -13,6 +13,8 @@ export type ExerciseData = {
   sides?: boolean;
   tempo?: string;
   progression?: boolean;
+  // A test whose result the program summary reports, such as a max set.
+  test?: boolean;
 };
 export type SectionData = {
   id: string;
@@ -45,6 +47,7 @@ export type Exercise = {
   sides: boolean;
   tempo: string;
   progression: boolean;
+  test: boolean;
 };
 export type Section = Omit<SectionData, 'rest' | 'exercises'> & {
   name: string;
@@ -96,6 +99,7 @@ const toExercise = (e: ExerciseData): Exercise => ({
   sides: e.sides ?? false,
   tempo: e.tempo ?? '',
   progression: e.progression ?? false,
+  test: e.test ?? false,
 });
 const toSection = ({ rest, exercises, ...section }: SectionData): Section => ({
   ...section,
@@ -125,6 +129,11 @@ export const programAt = (date: string) =>
   programs.find((p) => p.start <= date && date <= p.end) ??
   programs.filter((p) => p.start <= date).at(-1) ??
   programs[0];
+// The program whose last day has passed, until the next one starts.
+export function finishedProgramAt(date: string) {
+  const program = programAt(date);
+  return program.end < date ? program : null;
+}
 export const programDays = (program: Program) => days.filter((d) => d.program === program.id);
 // The section's wording without the "A. Name:" lead-in that its heading already shows. A
 // variation in the lead-in stays: "Hollow Hold (tucked): 3×20s" becomes "tucked · 3×20s".
@@ -323,8 +332,8 @@ export function onTime(d: Day, map: Record<string, Event[]>) {
   const completed = completedOn(d, map);
   return completed !== null && completed <= deadline(d, map);
 }
-export function streaks(map: Record<string, Event[]>, today: string) {
-  const scheduled = days
+export function streaks(map: Record<string, Event[]>, today: string, program?: Program) {
+  const scheduled = (program ? programDays(program) : days)
     .filter((d) => d.sections.length && deadline(d, map) <= today)
     .sort(
       (a, b) => deadline(a, map).localeCompare(deadline(b, map)) || a.date.localeCompare(b.date),
@@ -428,3 +437,13 @@ export function validateEvents(value: unknown): value is Event[] {
   );
 }
 export const isRunDay = (d: Day) => d.sections.some((s) => s.kind === 'run');
+// The screen lives after # in the URL: #/, #/workout/2026-10-22, #/schedule or #/progress.
+export type Screen = { view: 'today' | 'schedule' | 'progress'; date?: string };
+export function screenFromHash(hash: string): Screen {
+  const [, view, date] = hash.replace(/^#/, '').split('/');
+  if (view === 'schedule' || view === 'progress') return { view };
+  if (view === 'workout' && days.some((d) => d.date === date)) return { view: 'today', date };
+  return { view: 'today' };
+}
+export const hashForScreen = ({ view, date }: Screen) =>
+  view !== 'today' ? `#/${view}` : date ? `#/workout/${date}` : '#/';

@@ -11,6 +11,9 @@ import {
   programAt,
   programDays,
   resultEntries,
+  setCount,
+  setKey,
+  streaks,
   workoutSets,
   workoutStatus,
   type Day,
@@ -113,5 +116,87 @@ export function progressSummary(map: History, today: string, program: Program = 
       .filter((result) => result.unit === 'run')
       .reduce((sum, result) => sum + result.value, 0),
     measurements: measured.length,
+  };
+}
+
+const score = (result: { value: number; right?: number; sides?: boolean }) =>
+  result.sides ? Math.min(result.value, result.right ?? 0) : result.value;
+
+// Each tested exercise's best result in the last week that tests it, and the best from the
+// first week that did, when that was earlier: the final dead hang against Oct 16.
+function testResults(map: History, program: Program) {
+  const sets = programDays(program).flatMap((day) =>
+    day.sections.flatMap((section) =>
+      section.exercises
+        .filter((exercise) => exercise.test)
+        .flatMap((exercise) =>
+          Array.from({ length: setCount(day, map, exercise) }, (_, i) => ({
+            day,
+            exercise,
+            result: latest(map, setKey(day.date, exercise, i)),
+          })),
+        ),
+    ),
+  );
+  const bestIn = (list: typeof sets) =>
+    list
+      .filter(({ result }) => result && !result.skipped)
+      .map(({ result }) => ({
+        value: result.value as number,
+        ...(result.sides ? { right: result.right as number } : {}),
+        variation: result.variation as string,
+        date: result.actualDate as string,
+        score: score(result),
+      }))
+      .sort((a, b) => b.score - a.score)[0];
+  return [...new Set(sets.map((set) => set.exercise.name))]
+    .map((name) => {
+      const own = sets.filter((set) => set.exercise.name === name);
+      const first = own[0].day.code,
+        last = own.at(-1)!.day.code;
+      const final = own.filter((set) => set.day.code === last);
+      return {
+        name,
+        unit: own[0].exercise.unit,
+        sides: own[0].exercise.sides,
+        date: final[0].day.date,
+        best: bestIn(final),
+        baseline: first === last ? undefined : bestIn(own.filter((set) => set.day.code === first)),
+      };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// The best result for each exercise, variation, assistance and tempo, so a higher count at an
+// easier variation never counts as a best for a harder one. Runs are left out.
+export function personalBests(map: History, program?: Program) {
+  const own = program && new Set(programDays(program).map((day) => day.date));
+  const best: Record<string, any> = {};
+  for (const result of resultEntries(map)) {
+    if (result.unit === 'run' || (own && !own.has(result.day))) continue;
+    const key = JSON.stringify([
+      result.name,
+      result.variation,
+      result.assistance,
+      result.tempo,
+      result.unit,
+      result.sides,
+    ]);
+    if (!best[key] || score(result) > best[key].score)
+      best[key] = { ...result, score: score(result) };
+  }
+  return Object.values(best).sort(
+    (a, b) => a.name.localeCompare(b.name) || a.variation.localeCompare(b.variation),
+  );
+}
+
+export function programSummary(map: History, program: Program, today: string) {
+  const training = programDays(program).filter((day) => day.sections.length);
+  return {
+    completed: training.filter((day) => isFinished(workoutStatus(day, map, today))).length,
+    planned: training.length,
+    bestStreak: streaks(map, today, program).best,
+    personalBests: personalBests(map, program),
+    tests: testResults(map, program),
   };
 }

@@ -69,11 +69,17 @@ import {
   validateEvents,
   workoutSets,
   workoutStatus,
+  finishedProgramAt,
+  hashForScreen,
+  screenFromHash,
+  type Screen,
 } from './training-model';
 
 type User = { id: string; name: string; email: string } | null;
 import CloudAccount from './cloud-account';
 import ProgressOverview from './progress-overview';
+import ProgramSummary, { PersonalBestRows } from './program-summary';
+import { personalBests } from './progress-model';
 import { ALARM_SOUNDS, alarmSound, type AlarmSoundId } from './timer-sounds';
 import { supabase } from './supabase';
 import { syncHistory } from './cloud-sync';
@@ -91,7 +97,7 @@ const SCREENS = [
   { id: 'today', icon: Dumbbell, label: 'Today’s workout', tab: 'Today' },
   { id: 'schedule', icon: CalendarDays, label: 'Your schedule', tab: 'Schedule' },
   { id: 'progress', icon: TrendingUp, label: 'Your progress', tab: 'Progress' },
-];
+] as const;
 const idleTimer: TimerState = {
   end: null,
   remaining: 90,
@@ -99,10 +105,7 @@ const idleTimer: TimerState = {
   label: 'Ready when you are',
   running: false,
 };
-const firstToday = () => {
-  const now = localDate();
-  return days.find((d) => d.date >= now)?.date || days.at(-1)!.date;
-};
+const firstToday = (today: string) => days.find((d) => d.date >= today)?.date || days.at(-1)!.date;
 const remainingAt = (t: TimerState) =>
   t.running && t.end ? Math.max(0, Math.ceil((t.end - Date.now()) / 1000)) : t.remaining;
 // Only the countdown re-renders while a timer runs, not the whole app.
@@ -150,13 +153,25 @@ const sameResult = (a: any, b: any) =>
   Boolean(a.sides) === Boolean(b.sides);
 
 export default function TrainingApp({ user }: { user: User }) {
-  const [view, setViewState] = useState('today');
-  const setView = (v: string) => {
-    setViewState(v);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const [screen, setScreen] = useState(() => screenFromHash(location.hash));
+  useEffect(() => {
+    const onHashChange = () => {
+      setScreen(screenFromHash(location.hash));
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+  // Every screen change goes through the URL, so refresh and the back button keep your place.
+  const go = (next: Screen) => {
+    const hash = hashForScreen(next);
+    if (location.hash === hash) window.scrollTo({ top: 0, behavior: 'smooth' });
+    else location.hash = hash;
   };
-  const [selected, setSelected] = useState(firstToday);
+  const view = screen.view;
   const [today, setToday] = useState(() => localDate());
+  const selected = screen.date ?? firstToday(today);
+  const finished = view === 'today' && !screen.date ? finishedProgramAt(today) : null;
   const [store, setStore] = useState<Store>({ events: [], pending: [] });
   const storeRef = useRef<Store>(store);
   const [loaded, setLoaded] = useState(false);
@@ -595,15 +610,7 @@ export default function TrainingApp({ user }: { user: User }) {
     setModal(null);
   };
 
-  const openScreen = (id: string) => {
-    setView(id);
-    if (id === 'today') chooseDay(firstToday());
-  };
-  const chooseDay = (date: string) => {
-    setSelected(date);
-    setView('today');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const chooseDay = (date: string) => go({ view: 'today', date });
   const due = (d: Day) => effectiveDate(d, map);
   const countFor = (e: Exercise) => latest(map, `config:${day.date}:${e.id}`)?.count || e.count;
   const prescribed = (section: Section, e: Exercise): Exercise => {
@@ -917,16 +924,7 @@ export default function TrainingApp({ user }: { user: User }) {
   const runResults = results
     .filter((r) => r.unit === 'run')
     .sort((a, b) => a.actualDate.localeCompare(b.actualDate));
-  const comparablePBs = Object.values(
-    results
-      .filter((r) => r.unit !== 'run')
-      .reduce((acc: Record<string, any>, r) => {
-        const k = JSON.stringify([r.name, r.variation, r.assistance, r.tempo, r.unit, r.sides]);
-        const val = r.sides ? Math.min(r.value, r.right) : r.value;
-        if (!acc[k] || val > acc[k].score) acc[k] = { ...r, score: val };
-        return acc;
-      }, {}),
-  ).slice(0, 6);
+  const bests = personalBests(map).slice(0, 6);
   const reschedule = () => {
     if (!moveDate || moveDate < today || moveDate > program.end) {
       notify('Choose a date from today through the end of the program.');
@@ -945,10 +943,10 @@ export default function TrainingApp({ user }: { user: User }) {
       <aside className="sidebar">
         <a
           className="brand"
-          href="#"
+          href="#/"
           onClick={(e) => {
             e.preventDefault();
-            chooseDay(firstToday());
+            go({ view: 'today' });
           }}
         >
           <span className="brand-mark">
@@ -967,7 +965,7 @@ export default function TrainingApp({ user }: { user: User }) {
               key={id}
               className={`nav-item ${view === id ? 'active' : ''}`}
               aria-current={view === id ? 'page' : undefined}
-              onClick={() => openScreen(id)}
+              onClick={() => go({ view: id })}
             >
               <Icon size={20} />
               {label}
@@ -992,7 +990,7 @@ export default function TrainingApp({ user }: { user: User }) {
             <span>{Math.round((dayNumber / programLength) * 100)}%</span>
           </div>
           <span className="program-label">PROGRAM TIMELINE</span>
-          <button className="text-link" onClick={() => setView('schedule')}>
+          <button className="text-link" onClick={() => go({ view: 'schedule' })}>
             View your plan <ArrowUpRight size={16} />
           </button>
         </div>
@@ -1022,9 +1020,11 @@ export default function TrainingApp({ user }: { user: User }) {
               YOUR TRAINING <ChevronRight size={13} />
               <b>
                 {view === 'today'
-                  ? due(day) === today
-                    ? 'Today'
-                    : 'Workout'
+                  ? finished
+                    ? 'Program summary'
+                    : due(day) === today
+                      ? 'Today'
+                      : 'Workout'
                   : view === 'schedule'
                     ? 'Schedule'
                     : 'Progress'}
@@ -1075,7 +1075,15 @@ export default function TrainingApp({ user }: { user: User }) {
               <ArrowRight size={16} />
             </button>
           )}
-          {view === 'today' && (
+          {finished && (
+            <ProgramSummary
+              map={map}
+              program={finished}
+              today={today}
+              onOpen={(next) => go({ view: next })}
+            />
+          )}
+          {view === 'today' && !finished && (
             <>
               <section className="week-strip" aria-label="Week navigation">
                 <button
@@ -1536,7 +1544,7 @@ export default function TrainingApp({ user }: { user: User }) {
                       <p>None yet.</p>
                     )}
                   </section>
-                  <button className="progress-link" onClick={() => setView('progress')}>
+                  <button className="progress-link" onClick={() => go({ view: 'progress' })}>
                     <div>
                       <span className="eyebrow">SMALL WINS ADD UP</span>
                       <strong>See how far you’ve come</strong>
@@ -1568,7 +1576,7 @@ export default function TrainingApp({ user }: { user: User }) {
                   </h1>
                   <p>{program.summary}</p>
                 </div>
-                <button className="secondary" onClick={() => chooseDay(firstToday())}>
+                <button className="secondary" onClick={() => go({ view: 'today' })}>
                   Jump to today
                   <ArrowRight size={16} />
                 </button>
@@ -1706,28 +1714,7 @@ export default function TrainingApp({ user }: { user: User }) {
                     </div>
                     <Target size={20} />
                   </div>
-                  {comparablePBs.length ? (
-                    comparablePBs.map((r, i) => (
-                      <div className="pb-row" key={i}>
-                        <div>
-                          <strong>{r.name}</strong>
-                          <span>
-                            {r.variation} · {r.assistance || 'unassisted'}
-                            {r.tempo ? ' · ' + r.tempo : ''}
-                          </span>
-                        </div>
-                        <b>
-                          {r.score}
-                          <small>
-                            {r.unit}
-                            {r.sides ? ' / side' : ''}
-                          </small>
-                        </b>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="empty-line">No personal bests yet.</p>
-                  )}
+                  <PersonalBestRows bests={bests} />
                 </section>
               </div>
               <section className="run-history">
@@ -1785,7 +1772,7 @@ export default function TrainingApp({ user }: { user: User }) {
           </footer>
         </main>
       </div>
-      {view === 'today' && (
+      {view === 'today' && !finished && (
         <div className={`mobile-timer ${timerOpen ? 'expanded' : ''}`}>
           <button
             className="mobile-timer-toggle"
@@ -1850,7 +1837,7 @@ export default function TrainingApp({ user }: { user: User }) {
             key={id}
             className={view === id ? 'active' : ''}
             aria-current={view === id ? 'page' : undefined}
-            onClick={() => openScreen(id)}
+            onClick={() => go({ view: id })}
           >
             <Icon size={21} />
             {tab}

@@ -8,8 +8,9 @@ await build({
   outdir: '.work/progress-test',
   outExtension: { '.js': '.mjs' },
 });
-const { progressSummary, calendarDay } = await import('../.work/progress-test/progress-model.mjs');
-const { days, heads, completionChanges, setKey, streaks, workoutStatus } =
+const { progressSummary, calendarDay, programSummary } =
+  await import('../.work/progress-test/progress-model.mjs');
+const { days, heads, completionChanges, setKey, streaks, workoutStatus, programs } =
   await import('../.work/progress-test/training-model.mjs');
 const event = (id, entity, data, parents = []) => ({
   id,
@@ -161,5 +162,72 @@ test('A workout moved onto Sunday remains visible and mixed completion is explic
   assert.equal(mixed.status.id, 'partial');
   assert.equal(mixed.status.label, '1 of 2 workouts complete');
   assert.equal(mixed.target.date, '2026-10-20');
+});
+// A number entered for one set, as the result logger saves it.
+const logged = (date, id, i, value, extra = {}) => {
+  const e = dayOf(date)
+    .sections.flatMap((s) => s.exercises)
+    .find((e) => e.id === id);
+  return event(`${date}-${id}-${i}`, setKey(date, e, i), {
+    value,
+    ...(e.sides ? { right: value } : {}),
+    unit: e.unit,
+    name: e.name,
+    variation: e.variation,
+    assistance: '',
+    sides: e.sides,
+    day: date,
+    actualDate: date,
+    ...extra,
+  });
+};
+test('The program summary takes the best of each test and compares the dead hang with Oct 16', () => {
+  const map = heads([
+    logged('2026-10-16', 'b5e0', 0, 30),
+    logged('2027-01-04', 'b1e0', 0, 8),
+    logged('2027-01-04', 'b1e1', 0, 12),
+    logged('2027-01-05', 'b2e0', 0, 25),
+    logged('2027-01-05', 'b2e0', 1, 28),
+    logged('2027-01-07', 'b2e0', 2, 30),
+    logged('2027-01-06', 'b2e0', 0, 3, { right: 2 }),
+    logged('2027-01-08', 'b4e0', 0, 45),
+  ]);
+  const { tests } = programSummary(map, programs[0], '2027-01-11');
+  assert.deepEqual(
+    tests.map((t) => [t.name, t.best?.value, t.best?.right, t.baseline?.value, t.baseline?.date]),
+    [
+      ['Pull-Ups', 8, undefined, undefined, undefined],
+      ['Hollow Hold', 30, undefined, undefined, undefined],
+      ['L-Sit', undefined, undefined, undefined, undefined],
+      ['Chin-Ups', undefined, undefined, undefined, undefined],
+      ['Pistol Squat', 3, 2, undefined, undefined],
+      ['Dead Hang', 45, undefined, 30, '2026-10-16'],
+    ],
+  );
+});
+test('The program summary counts completed workouts against planned ones and the best streak', () => {
+  const map = heads(
+    ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-23'].flatMap((d) => tickAll(d)),
+  );
+  const summary = programSummary(map, programs[0], '2027-01-11');
+  assert.equal(summary.completed, 4);
+  assert.equal(summary.planned, 77);
+  assert.equal(summary.bestStreak, 3);
+});
+test('Personal bests compare results only within the same exercise variation', () => {
+  const map = heads([
+    logged('2026-10-13', 'b2e0', 0, 20),
+    logged('2026-10-20', 'b2e0', 0, 25),
+    logged('2027-01-05', 'b2e0', 0, 22),
+    logged('2026-10-20', 'b1e0', 0, 1.5),
+  ]);
+  const { personalBests } = programSummary(map, programs[0], '2027-01-11');
+  assert.deepEqual(
+    personalBests.map((r) => [r.name, r.variation, r.score]),
+    [
+      ['Hollow Hold', 'full', 22],
+      ['Hollow Hold', 'tucked', 25],
+    ],
+  );
 });
 console.log(`\n${count} progress checks passed.`);

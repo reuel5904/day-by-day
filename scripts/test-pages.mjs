@@ -27,6 +27,9 @@ const {
   untickChanges,
   workoutStatus,
   prescriptionLine,
+  finishedProgramAt,
+  screenFromHash,
+  hashForScreen,
 } = await import('../.work/pages-test/training-model.mjs');
 const { EXERCISES } = await import('../.work/pages-test/exercises.mjs');
 let count = 0;
@@ -438,6 +441,25 @@ test('A section that tests one exercise twice is headed by its name once', () =>
     sectionWith('B. Superset ×3: Push-Ups 10').name,
     'Push-Ups + Bulgarian Split Squats',
   );
+});
+test('Today summarizes a program once its last day has passed', () => {
+  assert.equal(finishedProgramAt('2026-10-22'), null);
+  assert.equal(finishedProgramAt('2027-01-10'), null);
+  assert.equal(finishedProgramAt('2027-01-11').id, '2026-10-13');
+  assert.equal(finishedProgramAt('2026-10-01'), null);
+});
+test('The URL keeps the screen and the chosen day', () => {
+  assert.deepEqual(screenFromHash('#/workout/2026-10-22'), { view: 'today', date: '2026-10-22' });
+  assert.deepEqual(screenFromHash('#/progress'), { view: 'progress' });
+  assert.deepEqual(screenFromHash('#/schedule'), { view: 'schedule' });
+  assert.deepEqual(screenFromHash(''), { view: 'today' });
+  assert.equal(hashForScreen({ view: 'today', date: '2026-10-22' }), '#/workout/2026-10-22');
+  assert.equal(hashForScreen({ view: 'progress' }), '#/progress');
+  assert.equal(hashForScreen({ view: 'today' }), '#/');
+});
+test('A URL for a day outside every program, or an unknown screen, opens Today', () => {
+  for (const hash of ['#/workout/2099-01-01', '#/workout/oops', '#/settings', '#'])
+    assert.deepEqual(screenFromHash(hash), { view: 'today' });
 });
 test('A history with imported completions still validates', () => {
   const events = [
