@@ -26,6 +26,7 @@ const {
   setKey,
   untickChanges,
   workoutStatus,
+  prescriptionLine,
 } = await import('../.work/pages-test/training-model.mjs');
 const { EXERCISES } = await import('../.work/pages-test/exercises.mjs');
 let count = 0;
@@ -406,6 +407,37 @@ test('Undoing a bulk check restores the prior explicit incomplete state', () => 
   const undone = event('undone', before.entity, before.data, [checked.id]);
   assert.equal(isSetComplete(heads([before, checked]), key), true);
   assert.equal(isSetComplete(heads([before, checked, undone]), key), false);
+});
+test('A prescription line leaves out the exercise name its heading already shows', () => {
+  const line = (text) => prescriptionLine(sectionWith(text));
+  assert.equal(line('Run: 1 mi easy'), '1 mi easy, walk breaks OK');
+  assert.equal(line('A. Chin-Ups: 4×1'), '4×1 · rest 2 min');
+  assert.equal(
+    line('Mobility 10 min: hip'),
+    'hip flexor stretch, deep squat hold, thoracic rotations',
+  );
+});
+test('A prescription line keeps the variation named in its lead-in', () => {
+  const line = (text) => prescriptionLine(sectionWith(text));
+  assert.equal(line('Hollow Hold (tucked): 3×20s · rest 45s'), 'tucked · 3×20s · rest 45s');
+  assert.equal(line('L-Sit (tuck hold, floor)'), 'tuck hold, floor · 3×10s · rest 60s');
+  assert.equal(line('Single-Leg Calf Raises: 3×12/leg'), 'Single-Leg · 3×12/leg');
+  assert.equal(line('Max Dead Hang'), 'Max · 1× max. Log it.');
+});
+test('Superset and test lines keep their wording, since it pairs names with numbers', () => {
+  for (const text of [
+    'B. Superset ×3: Push-Ups 10 → Bulgarian Split Squats 6/leg · rest 90s',
+    'TEST: Pull-Ups, 1 max set. Log it. Then 2×3 easy · rest 2 min',
+    'Full Hollow 3×20-30s and L-Sit 3×15-20s again. Best of Tue/Thu counts.',
+  ])
+    assert.equal(prescriptionLine(sectionWith(text)), text);
+});
+test('A section that tests one exercise twice is headed by its name once', () => {
+  assert.equal(sectionWith('TEST: Pull-Ups, 1 max set.').name, 'Pull-Ups');
+  assert.equal(
+    sectionWith('B. Superset ×3: Push-Ups 10').name,
+    'Push-Ups + Bulgarian Split Squats',
+  );
 });
 test('A history with imported completions still validates', () => {
   const events = [

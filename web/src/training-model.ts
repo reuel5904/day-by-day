@@ -99,7 +99,7 @@ const toExercise = (e: ExerciseData): Exercise => ({
 });
 const toSection = ({ rest, exercises, ...section }: SectionData): Section => ({
   ...section,
-  name: exercises.map((e) => e.name).join(' + '),
+  name: [...new Set(exercises.map((e) => e.name))].join(' + '),
   rest: rest ?? 0,
   exercises: exercises.map(toExercise),
 });
@@ -126,6 +126,23 @@ export const programAt = (date: string) =>
   programs.filter((p) => p.start <= date).at(-1) ??
   programs[0];
 export const programDays = (program: Program) => days.filter((d) => d.program === program.id);
+// The section's wording without the "A. Name:" lead-in that its heading already shows. A
+// variation in the lead-in stays: "Hollow Hold (tucked): 3×20s" becomes "tucked · 3×20s".
+export function prescriptionLine(section: Section) {
+  const [, lead = '', rest] = section.text.match(/^(?:[A-Z]\. )?(.+?): (.*)$/) ?? [];
+  for (const { name } of section.exercises) {
+    const variation =
+      lead === name
+        ? ''
+        : lead.startsWith(name + ' (') && lead.endsWith(')')
+          ? lead.slice(name.length + 2, -1)
+          : lead.endsWith(' ' + name)
+            ? lead.slice(0, -name.length - 1)
+            : null;
+    if (variation !== null) return variation ? `${variation} · ${rest}` : rest;
+  }
+  return section.text;
+}
 export const setKey = (day: string, e: Exercise, i: number) => `set:${day}:${e.id}:${i}`;
 export const completionKey = (key: string) => key.replace(/^set:/, 'completion:');
 export function isSetComplete(map: Record<string, Event[]>, key: string): boolean {

@@ -91,10 +91,6 @@ export default function ProgressOverview({
               ))}
             </div>
           </div>
-          <p className="progress-explanation">
-            Rest days are excluded. A partial workout remains activity; Finish workout saves a
-            completed session.
-          </p>
         </section>
         <section className="training-mix-card">
           <span className="eyebrow">YOUR WORK, SO FAR</span>
@@ -131,10 +127,6 @@ export default function ProgressOverview({
               <strong>{streak.best}</strong> best
             </span>
           </div>
-          <p className="progress-explanation">
-            Workout counts include imported completions. Active days need a recorded date; miles
-            need a logged distance.
-          </p>
         </section>
       </div>
       <section className="activity-card rhythm-card">
@@ -158,52 +150,48 @@ export default function ProgressOverview({
             </p>
           </div>
         </div>
-        <div className="rhythm-scroll">
-          <div className="rhythm-calendar">
-            <div className="rhythm-labels">
-              <span />
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
-                <span key={label}>{label}</span>
-              ))}
-            </div>
-            {summary.weeks.map((week) => (
-              <div className="rhythm-week" key={week.start}>
-                <span className="rhythm-week-label">{dateLabel(week.start)}</span>
-                {Array.from({ length: 7 }, (_, i) => {
-                  const date = addDays(week.start, i);
-                  if (date < program.start || date > program.end)
-                    return <span className="rhythm-placeholder" key={date} />;
-                  const { status, target, workoutCount } = calendarDay(date, map, today);
-                  return (
-                    <button
-                      key={date}
-                      disabled={!target}
-                      className={`rhythm-day ${status.id} ${date === today ? 'rhythm-today' : ''}`}
-                      onClick={() => target && onChoose(target.date)}
-                      title={`${dateLabel(date)} · ${status.label}${workoutCount > 1 ? ` · ${workoutCount} workouts` : ''}`}
-                      aria-label={`${dateLabel(date, { weekday: 'long', month: 'short', day: 'numeric' })}, ${status.label}${workoutCount > 1 ? `, ${workoutCount} workouts` : ''}`}
-                    >
-                      <span>{dateLabel(date, { day: 'numeric' })}</span>
-                      {status.id === 'rest' ? (
-                        <span className="rhythm-rest">
-                          <Leaf size={12} />
-                          Rest
-                        </span>
-                      ) : status.id === 'complete' || status.id === 'legacy' ? (
-                        <Check size={13} />
-                      ) : status.id === 'started' || status.id === 'partial' ? (
-                        <span className="rhythm-dot" />
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
+        <div className="rhythm-calendar">
+          <div className="rhythm-labels">
+            <span />
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
+              <span key={label}>{label}</span>
             ))}
           </div>
+          {summary.weeks.map((week) => (
+            <div className="rhythm-week" key={week.start}>
+              <span className="rhythm-week-label">{dateLabel(week.start)}</span>
+              {Array.from({ length: 7 }, (_, i) => {
+                const date = addDays(week.start, i);
+                if (date < program.start || date > program.end)
+                  return <span className="rhythm-placeholder" key={date} />;
+                const { status, target, workoutCount } = calendarDay(date, map, today);
+                return (
+                  <button
+                    key={date}
+                    disabled={!target}
+                    className={`rhythm-day ${status.id} ${date === today ? 'rhythm-today' : ''}`}
+                    onClick={() => target && onChoose(target.date)}
+                    title={`${dateLabel(date)} · ${status.label}${workoutCount > 1 ? ` · ${workoutCount} workouts` : ''}`}
+                    aria-label={`${dateLabel(date, { weekday: 'long', month: 'short', day: 'numeric' })}, ${status.label}${workoutCount > 1 ? `, ${workoutCount} workouts` : ''}`}
+                  >
+                    <span>{dateLabel(date, { day: 'numeric' })}</span>
+                    {status.id === 'rest' ? (
+                      <span className="rhythm-rest">
+                        <Leaf size={12} />
+                        Rest
+                      </span>
+                    ) : status.id === 'complete' || status.id === 'legacy' ? (
+                      <Check size={13} />
+                    ) : status.id === 'started' || status.id === 'partial' ? (
+                      <span className="rhythm-dot" />
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
-        <p className="rhythm-help">
-          Scroll across for later weeks. Select a day to open its workout.
-        </p>
+        <p className="rhythm-help">Select a day to open its workout.</p>
         <div className="rhythm-legend">
           <span>
             <i className="complete" />
@@ -239,10 +227,6 @@ export default function ProgressOverview({
         <div>
           <span className="eyebrow">MEASURE YOUR PERFORMANCE</span>
           <h2>Reps, holds & running</h2>
-          <p>
-            Checkmarks power the stats above. Open <strong>Log results</strong> under an exercise to
-            record reps, seconds or distance for the charts below.
-          </p>
         </div>
         <span>
           {summary.measurements} measured {summary.measurements === 1 ? 'result' : 'results'}

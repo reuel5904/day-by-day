@@ -19,9 +19,7 @@ import {
   Flag,
   Footprints,
   Leaf,
-  ListChecks,
   LoaderCircle,
-  Menu,
   Pause,
   Play,
   Plus,
@@ -61,6 +59,7 @@ import {
   moveWorkout,
   programAt,
   programDays,
+  prescriptionLine,
   resultEntries,
   Section,
   setKey,
@@ -68,6 +67,7 @@ import {
   topOf,
   untickChanges,
   validateEvents,
+  workoutSets,
   workoutStatus,
 } from './training-model';
 
@@ -87,6 +87,11 @@ type TimerState = {
   done?: boolean;
 };
 const TIMER_PRESETS = [30, 45, 60, 90, 120];
+const SCREENS = [
+  { id: 'today', icon: Dumbbell, label: 'Today’s workout', tab: 'Today' },
+  { id: 'schedule', icon: CalendarDays, label: 'Your schedule', tab: 'Schedule' },
+  { id: 'progress', icon: TrendingUp, label: 'Your progress', tab: 'Progress' },
+];
 const idleTimer: TimerState = {
   end: null,
   remaining: 90,
@@ -174,8 +179,6 @@ export default function TrainingApp({ user }: { user: User }) {
   const [alarmTest, setAlarmTest] = useState(false);
   const [timer, setTimer] = useState<TimerState>(idleTimer);
   const [timerOpen, setTimerOpen] = useState(false);
-  const [started, setStarted] = useState(false);
-  const [mobileMenu, setMobileMenu] = useState(false);
   const dialogRef = useRef<HTMLElement>(null);
   const [exerciseFilter, setExerciseFilter] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
@@ -228,7 +231,8 @@ export default function TrainingApp({ user }: { user: User }) {
   }, []);
   const map = useMemo(() => heads(store.events), [store.events]);
   const day = days.find((d) => d.date === selected) || days[0];
-  const recordedSessionDate = workoutStatus(day, map, today).actualDate;
+  const status = workoutStatus(day, map, today);
+  const recordedSessionDate = status.actualDate;
   useEffect(
     () => setLoggingDate(recordedSessionDate || today),
     [selected, today, recordedSessionDate],
@@ -399,9 +403,8 @@ export default function TrainingApp({ user }: { user: User }) {
     const t = setTimeout(() => void sync(), 1500);
     return () => clearTimeout(t);
   }, [store.pending.length, loaded, sync]);
-  useEffect(() => {
-    setNote(latest(map, `notes:${selected}`)?.text || '');
-  }, [selected, store.events.length]);
+  const savedNote: string = latest(map, `notes:${selected}`)?.text || '';
+  useEffect(() => setNote(savedNote), [selected, savedNote]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(''), 5000);
@@ -508,8 +511,10 @@ export default function TrainingApp({ user }: { user: User }) {
       /* The timer keeps running; it just won't survive a reload. */
     }
   }, [timer, loaded]);
+  // Keep the screen on mid-workout and while resting, so the timer can sound.
+  const keepAwake = status.id === 'started' || timer.running;
   useEffect(() => {
-    if (!started) return;
+    if (!keepAwake) return;
     const request = async () => {
       try {
         if (document.visibilityState === 'visible' && 'wakeLock' in navigator)
@@ -522,7 +527,7 @@ export default function TrainingApp({ user }: { user: User }) {
       void wake.current?.release();
       document.removeEventListener('visibilitychange', request);
     };
-  }, [started]);
+  }, [keepAwake]);
   const startRest = (duration: number, label: string) => {
     if (!duration) return;
     unlockAudio();
@@ -590,14 +595,16 @@ export default function TrainingApp({ user }: { user: User }) {
     setModal(null);
   };
 
+  const openScreen = (id: string) => {
+    setView(id);
+    if (id === 'today') chooseDay(firstToday());
+  };
   const chooseDay = (date: string) => {
     setSelected(date);
-    setStarted(false);
     setView('today');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const due = (d: Day) => effectiveDate(d, map);
-  const status = workoutStatus(day, map, today);
   const countFor = (e: Exercise) => latest(map, `config:${day.date}:${e.id}`)?.count || e.count;
   const prescribed = (section: Section, e: Exercise): Exercise => {
     const count = countFor(e);
@@ -615,7 +622,11 @@ export default function TrainingApp({ user }: { user: User }) {
   const allSets = day.sections.flatMap(setsOf);
   const allSetKeys = allSets.map((set) => set.key);
   const doneKeys = allSetKeys.filter((k) => isSetComplete(map, k));
-  const percent = allSetKeys.length ? Math.round((doneKeys.length / allSetKeys.length) * 100) : 0;
+  const requiredKeys = workoutSets(day, map)
+    .filter((set) => !set.optional)
+    .map((set) => set.key);
+  const requiredDone = requiredKeys.filter((k) => isSetComplete(map, k)).length;
+  const percent = requiredKeys.length ? Math.round((requiredDone / requiredKeys.length) * 100) : 0;
   const weekStart = mondayOf(selected);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const planned = days.filter(
@@ -807,7 +818,6 @@ export default function TrainingApp({ user }: { user: User }) {
     setBulkUndo([]);
     stopAlarm();
     setModal(null);
-    setStarted(false);
     setTimer((t) => ({ ...t, running: false, end: null, remaining: remainingAt(t) }));
     notify('Partial workout saved. Every ticked set counts.');
   };
@@ -932,7 +942,7 @@ export default function TrainingApp({ user }: { user: User }) {
 
   return (
     <div className="app-shell">
-      <aside className={`sidebar ${mobileMenu ? 'mobile-open' : ''}`}>
+      <aside className="sidebar">
         <a
           className="brand"
           href="#"
@@ -952,20 +962,12 @@ export default function TrainingApp({ user }: { user: User }) {
         </a>
         <div className="sidebar-caption">YOUR DAILY PRACTICE</div>
         <nav aria-label="Main navigation">
-          {[
-            { id: 'today', icon: Dumbbell, label: 'Today’s workout' },
-            { id: 'schedule', icon: CalendarDays, label: 'Your schedule' },
-            { id: 'progress', icon: TrendingUp, label: 'Your progress' },
-          ].map(({ id, icon: Icon, label }) => (
+          {SCREENS.map(({ id, icon: Icon, label }) => (
             <button
               key={id}
               className={`nav-item ${view === id ? 'active' : ''}`}
               aria-current={view === id ? 'page' : undefined}
-              onClick={() => {
-                setView(id);
-                setMobileMenu(false);
-                if (id === 'today') chooseDay(firstToday());
-              }}
+              onClick={() => openScreen(id)}
             >
               <Icon size={20} />
               {label}
@@ -995,13 +997,7 @@ export default function TrainingApp({ user }: { user: User }) {
           </button>
         </div>
         <div className="sidebar-bottom">
-          <button
-            className="nav-item"
-            onClick={() => {
-              setSettings(true);
-              setMobileMenu(false);
-            }}
-          >
+          <button className="nav-item" onClick={() => setSettings(true)}>
             <Settings2 size={19} />
             Settings & backup
           </button>
@@ -1022,13 +1018,6 @@ export default function TrainingApp({ user }: { user: User }) {
       <div className="main-wrap">
         <header className="topbar">
           <div>
-            <button
-              className="mobile-menu icon-button"
-              aria-label="Open navigation"
-              onClick={() => setMobileMenu((v) => !v)}
-            >
-              <Menu size={22} />
-            </button>
             <span className="breadcrumb">
               YOUR TRAINING <ChevronRight size={13} />
               <b>
@@ -1045,6 +1034,7 @@ export default function TrainingApp({ user }: { user: User }) {
           <div className="topbar-right">
             <button
               className="sync-indicator"
+              aria-label={syncStatus}
               title={user ? 'Sync now' : 'Sign in to sync across devices'}
               onClick={() => {
                 if (user) void sync();
@@ -1068,6 +1058,13 @@ export default function TrainingApp({ user }: { user: User }) {
             >
               {muted ? <VolumeX size={19} /> : <Volume2 size={19} />}
             </button>
+            <button
+              className="icon-button topbar-settings"
+              aria-label="Settings and backup"
+              onClick={() => setSettings(true)}
+            >
+              <Settings2 size={19} />
+            </button>
           </div>
         </header>
         <main>
@@ -1080,26 +1077,6 @@ export default function TrainingApp({ user }: { user: User }) {
           )}
           {view === 'today' && (
             <>
-              <div className="page-heading">
-                <div>
-                  <span className="eyebrow">
-                    {dateLabel(due(day), {
-                      weekday: 'long',
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </span>
-                  <h1>
-                    Let’s make <span>today count.</span>
-                  </h1>
-                  <p>A few good sets. A little stronger. You’ve got this.</p>
-                </div>
-                <span className="phase-tag">
-                  <span />
-                  WEEK {weekIndex} OF {program.weeks.length}
-                </span>
-              </div>
               <section className="week-strip" aria-label="Week navigation">
                 <button
                   className="week-arrow"
@@ -1175,18 +1152,35 @@ export default function TrainingApp({ user }: { user: User }) {
               )}
               <div className="workout-layout">
                 <div className="workout-column">
-                  <section className={`workout-hero ${!day.sections.length ? 'rest-hero' : ''}`}>
-                    <div className="hero-top">
-                      <span className="pill">
-                        <span />
-                        {day.code} · {day.phase.split(' (')[0]}
-                      </span>
+                  <header className="today-header">
+                    <div>
+                      <h1>{day.sections.length ? day.title : 'Rest day'}</h1>
+                      <p>
+                        <span>
+                          {dateLabel(due(day), {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </span>
+                        <span>
+                          Week {weekIndex} of {program.weeks.length}
+                        </span>
+                        {day.sections.length > 0 && (
+                          <span>
+                            {requiredDone} of {requiredKeys.length} sets
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    {['complete', 'partial', 'legacy', 'empty', 'conflict'].includes(status.id) && (
+                      <span className={`status-tag ${status.id}`}>{status.label}</span>
+                    )}
+                    {day.sections.length > 0 && (
                       <button
                         className="icon-button"
                         aria-label="Reschedule workout"
-                        disabled={
-                          !day.sections.length || isFinished(status) || status.id === 'partial'
-                        }
+                        disabled={isFinished(status) || status.id === 'partial'}
                         onClick={() => {
                           setMoveDate(due(day) < today ? today : due(day));
                           setModal('move');
@@ -1194,104 +1188,21 @@ export default function TrainingApp({ user }: { user: User }) {
                       >
                         <CalendarDays size={19} />
                       </button>
-                    </div>
-                    <div className="hero-content">
-                      <div>
-                        <h2>
-                          {!day.sections.length
-                            ? 'Recovery is progress.'
-                            : isRunDay(day)
-                              ? day.title
-                              : 'Strength day.'}
-                        </h2>
-                        <p>
-                          {!day.sections.length
-                            ? 'Rest, recharge, and come back ready.'
-                            : isRunDay(day)
-                              ? 'Find your rhythm. Build your endurance.'
-                              : 'Build a stronger foundation, one good rep at a time.'}
-                        </p>
-                        <div className="hero-details">
-                          {day.sections.length > 0 && (
-                            <>
-                              <span>
-                                <ListChecks size={15} />
-                                {
-                                  day.sections
-                                    .flatMap((s) => s.exercises)
-                                    .filter((e) => e.unit !== 'check').length
-                                }{' '}
-                                exercises
-                              </span>
-                              <span>
-                                <Target size={15} />
-                                {allSetKeys.length -
-                                  day.sections.filter((s) => s.kind === 'prep').length}{' '}
-                                sets
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="hero-art" aria-hidden="true">
-                        <svg viewBox="0 0 130 110">
-                          <path
-                            d="M15 99h102M31 99V12h65v87M31 23h65"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                          />
-                          <circle cx="64" cy="39" r="9" fill="currentColor" />
-                          <path
-                            d="M43 24l5 25 16 9 16-9 5-25M64 54v22m0-2L49 94m15-20 15 20"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        <span className="art-orbit" />
-                      </div>
-                    </div>
-                    {day.sections.length > 0 && (
-                      <div className="hero-bottom">
-                        <span>
-                          {status.id === 'complete'
-                            ? 'Completed. Nicely done.'
-                            : status.id === 'partial'
-                              ? 'Partial workout saved'
-                              : status.id === 'legacy'
-                                ? 'Imported completion · results not recorded'
-                                : started
-                                  ? 'You’re in. Make each set count.'
-                                  : 'Steady reps. Strong foundation.'}
-                        </span>
-                        <button
-                          className="primary"
-                          onClick={() => {
-                            unlockAudio();
-                            setStarted(true);
-                            document
-                              .getElementById('exercise-list')
-                              ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                          }}
-                        >
-                          {started ? 'Keep going' : 'Let’s train'}
-                          <ArrowRight size={17} />
-                        </button>
-                      </div>
                     )}
-                  </section>
+                  </header>
                   {!!day.note && (
-                    <div className="coach-note">
-                      <BookOpen size={18} />
-                      <p>
-                        <strong>This week’s focus</strong>
-                        {day.note}
-                      </p>
-                    </div>
+                    <p className="coach-note">
+                      <strong>
+                        {day.code} · {day.phase.split(' (')[0]}
+                      </strong>
+                      {day.note}
+                    </p>
+                  )}
+                  {!day.sections.length && (
+                    <p className="rest-note">
+                      <Leaf size={18} />
+                      No workout scheduled. Rest days keep your streak going.
+                    </p>
                   )}
                   {day.sections.length > 0 && selected !== today && (
                     <label className="historical-date">
@@ -1311,12 +1222,15 @@ export default function TrainingApp({ user }: { user: User }) {
                   )}
                   {day.sections.length > 0 && (
                     <section id="exercise-list" className="exercise-section">
-                      <div className="section-heading workout-list-heading">
-                        <div>
-                          <h2>Your workout</h2>
-                          <span>
-                            {doneKeys.length} of {allSetKeys.length} complete
-                          </span>
+                      <div className="workout-toolbar">
+                        <div
+                          className="session-progress"
+                          role="progressbar"
+                          aria-label="Sets complete"
+                          aria-valuenow={requiredDone}
+                          aria-valuemax={requiredKeys.length}
+                        >
+                          <span style={{ width: `${percent}%` }} />
                         </div>
                         {bulkUndo.length > 0 && (
                           <button className="undo-check-all" onClick={undoCheckAll}>
@@ -1326,122 +1240,117 @@ export default function TrainingApp({ user }: { user: User }) {
                         )}
                         <button
                           className="check-all-button"
-                          disabled={percent === 100}
+                          disabled={doneKeys.length === allSetKeys.length}
                           onClick={() => checkAll(allSets, 'Workout')}
                         >
                           <CheckCheck size={17} />
                           Check all
                         </button>
                       </div>
-                      <div className="session-progress">
-                        <span style={{ width: `${percent}%` }} />
-                      </div>
-                      {day.sections.map((section, si) => (
-                        <article className="exercise-card" key={selected + section.id}>
-                          <div className="exercise-card-head">
-                            <div
-                              className={`block-number ${section.exercises.every((e) => Array.from({ length: countFor(e) }, (_, i) => setKey(day.date, e, i)).every((k) => isSetComplete(map, k))) ? 'block-complete' : ''}`}
-                            >
-                              {section.exercises.every((e) =>
-                                Array.from({ length: countFor(e) }, (_, i) =>
-                                  setKey(day.date, e, i),
-                                ).every((k) => isSetComplete(map, k)),
-                              ) ? (
-                                <Check size={17} />
-                              ) : (
-                                String(si + 1).padStart(2, '0')
-                              )}
-                            </div>
-                            <div>
-                              <span className="eyebrow">
-                                {section.kind === 'superset'
-                                  ? `${Math.min(...section.exercises.map(countFor))} ROUNDS · SUPERSET`
-                                  : section.kind === 'prep'
-                                    ? 'PREPARE & RECOVER'
-                                    : section.kind === 'run'
-                                      ? 'ENDURANCE'
-                                      : 'QUALITY OVER QUANTITY'}
-                              </span>
-                              <h3>{section.name}</h3>
-                            </div>
-                            {section.rest > 0 && (
-                              <button
-                                className="rest-chip"
-                                onClick={() => startRest(section.rest, section.name)}
+                      {day.sections.map((section, si) => {
+                        const sets = setsOf(section);
+                        const sectionDone = sets.every(({ key }) => isSetComplete(map, key));
+                        return (
+                          <article className="exercise-card" key={selected + section.id}>
+                            <div className="exercise-card-head">
+                              <div
+                                className={`block-number ${sectionDone ? 'block-complete' : ''}`}
                               >
-                                <Timer size={13} />
-                                {formatTime(section.rest)}
-                              </button>
-                            )}
-                            <button
-                              className="section-check-all"
-                              aria-label={`Check all in ${section.kind === 'superset' ? 'superset' : section.name} section`}
-                              disabled={section.exercises.every((e) =>
-                                Array.from({ length: countFor(e) }, (_, i) =>
-                                  setKey(day.date, e, i),
-                                ).every((k) => isSetComplete(map, k)),
+                                {sectionDone ? (
+                                  <Check size={17} />
+                                ) : (
+                                  String(si + 1).padStart(2, '0')
+                                )}
+                              </div>
+                              <div>
+                                <span className="eyebrow">
+                                  {section.kind === 'superset'
+                                    ? `${Math.min(...section.exercises.map(countFor))} ROUNDS · SUPERSET`
+                                    : section.kind === 'prep'
+                                      ? 'PREPARE & RECOVER'
+                                      : section.kind === 'run'
+                                        ? 'ENDURANCE'
+                                        : 'QUALITY OVER QUANTITY'}
+                                </span>
+                                <h3>{section.name}</h3>
+                              </div>
+                              {section.rest > 0 && (
+                                <button
+                                  className="rest-chip"
+                                  onClick={() => startRest(section.rest, section.name)}
+                                >
+                                  <Timer size={13} />
+                                  {formatTime(section.rest)}
+                                </button>
                               )}
-                              onClick={() =>
-                                checkAll(
-                                  setsOf(section),
-                                  section.kind === 'superset' ? 'Section' : section.name,
-                                )
-                              }
-                            >
-                              <CheckCheck size={16} />
-                              <span>Check all</span>
-                            </button>
-                          </div>
-                          <div className="prescription">
-                            {section.text}
-                            {originalChecks[si] && (
-                              <span className="legacy-tag">
-                                <Check size={12} />
-                                Previously checked · imported
-                              </span>
+                              {sets.length > 1 && (
+                                <button
+                                  className="section-check-all"
+                                  aria-label={`Check all in ${section.kind === 'superset' ? 'superset' : section.name} section`}
+                                  disabled={sectionDone}
+                                  onClick={() =>
+                                    checkAll(
+                                      sets,
+                                      section.kind === 'superset' ? 'Section' : section.name,
+                                    )
+                                  }
+                                >
+                                  <CheckCheck size={16} />
+                                  <span>Check all</span>
+                                </button>
+                              )}
+                            </div>
+                            <div className="prescription">
+                              {prescriptionLine(section)}
+                              {originalChecks[si] && (
+                                <span className="legacy-tag">
+                                  <Check size={12} />
+                                  Previously checked · imported
+                                </span>
+                              )}
+                            </div>
+                            {section.alternatives && (
+                              <label className="alternative-choice">
+                                Follow the program’s set option
+                                <select
+                                  value={countFor(section.exercises[0])}
+                                  onChange={(e) =>
+                                    write(`config:${day.date}:${section.exercises[0].id}`, {
+                                      count: +e.target.value,
+                                    })
+                                  }
+                                >
+                                  {section.alternatives.map((option) => (
+                                    <option key={option.count} value={option.count}>
+                                      {option.count} sets × {option.target.replace('-', '–')} reps
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
                             )}
-                          </div>
-                          {section.alternatives && (
-                            <label className="alternative-choice">
-                              Follow the program’s set option
-                              <select
-                                value={countFor(section.exercises[0])}
-                                onChange={(e) =>
-                                  write(`config:${day.date}:${section.exercises[0].id}`, {
-                                    count: +e.target.value,
-                                  })
+                            {section.exercises.map((e) => (
+                              <ExerciseLogger
+                                key={selected + e.id}
+                                exercise={prescribed(section, e)}
+                                day={day}
+                                map={map}
+                                previous={previous}
+                                onSave={(i, data) => saveSet(e, i, data, section)}
+                                write={write}
+                                notify={notify}
+                                results={results}
+                                onToggle={(i) => toggleSet(prescribed(section, e), i, section)}
+                                onCheckAll={() =>
+                                  checkAll(
+                                    sets.filter((set) => set.exercise.id === e.id),
+                                    e.name,
+                                  )
                                 }
-                              >
-                                {section.alternatives.map((option) => (
-                                  <option key={option.count} value={option.count}>
-                                    {option.count} sets × {option.target.replace('-', '–')} reps
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          )}
-                          {section.exercises.map((e) => (
-                            <ExerciseLogger
-                              key={selected + e.id}
-                              exercise={prescribed(section, e)}
-                              day={day}
-                              map={map}
-                              previous={previous}
-                              onSave={(i, data) => saveSet(e, i, data, section)}
-                              write={write}
-                              notify={notify}
-                              results={results}
-                              onToggle={(i) => toggleSet(prescribed(section, e), i, section)}
-                              onCheckAll={() =>
-                                checkAll(
-                                  setsOf(section).filter((set) => set.exercise.id === e.id),
-                                  e.name,
-                                )
-                              }
-                            />
-                          ))}
-                        </article>
-                      ))}
+                              />
+                            ))}
+                          </article>
+                        );
+                      })}
                       <section className="notes-card">
                         <label htmlFor="session-notes">
                           <BookOpen size={17} />A note for next time
@@ -1453,8 +1362,7 @@ export default function TrainingApp({ user }: { user: User }) {
                           maxLength={10000}
                           onChange={(e) => setNote(e.target.value)}
                           onBlur={() => {
-                            if (note !== (latest(map, `notes:${selected}`)?.text || ''))
-                              write(`notes:${selected}`, { text: note });
+                            if (note !== savedNote) write(`notes:${selected}`, { text: note });
                           }}
                         />
                         <span>Notes save when you leave the field.</span>
@@ -1478,8 +1386,7 @@ export default function TrainingApp({ user }: { user: User }) {
                           <button
                             className="secondary"
                             onClick={() => {
-                              if (note !== (latest(map, `notes:${selected}`)?.text || ''))
-                                write(`notes:${selected}`, { text: note });
+                              if (note !== savedNote) write(`notes:${selected}`, { text: note });
                               setActualDate(loggingDate);
                               setModal('finish');
                             }}
@@ -1626,10 +1533,7 @@ export default function TrainingApp({ user }: { user: User }) {
                         </div>
                       ))
                     ) : (
-                      <>
-                        <h3>Your next win starts here.</h3>
-                        <p>Log a few sessions to reveal improvements at the same variation.</p>
-                      </>
+                      <p>None yet.</p>
                     )}
                   </section>
                   <button className="progress-link" onClick={() => setView('progress')}>
@@ -1791,33 +1695,7 @@ export default function TrainingApp({ user }: { user: User }) {
                       </p>
                     </>
                   ) : (
-                    <div className="empty-chart">
-                      <svg viewBox="0 0 500 130" aria-hidden="true">
-                        <path
-                          d="M0 110H500M0 65H500M0 20H500"
-                          stroke="#e5eae5"
-                          strokeDasharray="4 5"
-                        />
-                        <path
-                          d="M20 102L100 88L175 93L250 60L330 52L405 30L480 15"
-                          stroke="#b8cdbf"
-                          strokeWidth="3"
-                          strokeDasharray="6 7"
-                          fill="none"
-                        />
-                      </svg>
-                      <div>
-                        <span className="empty-icon">
-                          <TrendingUp size={22} />
-                        </span>
-                        <h3>Your first set starts the story.</h3>
-                        <p>
-                          Log reps or hold times to see your performance here.
-                          <br />
-                          This illustration isn’t workout data.
-                        </p>
-                      </div>
-                    </div>
+                    <p className="empty-line">No recorded results yet.</p>
                   )}
                 </section>
                 <section className="pb-card">
@@ -1848,18 +1726,7 @@ export default function TrainingApp({ user }: { user: User }) {
                       </div>
                     ))
                   ) : (
-                    <div className="pb-empty">
-                      <Flag size={27} />
-                      <h3>Set your starting point.</h3>
-                      <p>
-                        Your bests will appear as you log results. There’s no need to have a
-                        baseline already.
-                      </p>
-                      <button className="text-link" onClick={() => chooseDay(firstToday())}>
-                        Log your first workout
-                        <ArrowRight size={16} />
-                      </button>
-                    </div>
+                    <p className="empty-line">No personal bests yet.</p>
                   )}
                 </section>
               </div>
@@ -1886,9 +1753,7 @@ export default function TrainingApp({ user }: { user: User }) {
                     ))}
                   </div>
                 ) : (
-                  <p className="empty-line">
-                    Tick a run to log its miles. Add its time under Log results to see your pace.
-                  </p>
+                  <p className="empty-line">No runs logged yet.</p>
                 )}
               </section>
               <section className="recent-history">
@@ -1909,12 +1774,7 @@ export default function TrainingApp({ user }: { user: User }) {
                     <ArrowUpRight size={16} />
                   </button>
                 ))}
-                {!recentWorkouts.length && (
-                  <p className="empty-line">
-                    Your completed and partial workouts will live here. Older results can be entered
-                    by opening their date in Schedule.
-                  </p>
-                )}
+                {!recentWorkouts.length && <p className="empty-line">No workouts yet.</p>}
               </section>
             </>
           )}
@@ -1984,6 +1844,19 @@ export default function TrainingApp({ user }: { user: User }) {
           )}
         </div>
       )}
+      <nav className="tab-bar" aria-label="Screens">
+        {SCREENS.map(({ id, icon: Icon, tab }) => (
+          <button
+            key={id}
+            className={view === id ? 'active' : ''}
+            aria-current={view === id ? 'page' : undefined}
+            onClick={() => openScreen(id)}
+          >
+            <Icon size={21} />
+            {tab}
+          </button>
+        ))}
+      </nav>
       {(timer.done || alarmTest) && (
         <div className="alarm-banner" role="alert">
           <Bell size={24} />
@@ -2288,21 +2161,20 @@ function TrendChart({ results }: { results: any[] }) {
       >
         {[0, 0.5, 1].map((p) => (
           <g key={p}>
-            <path d={`M35 ${y(max * p)}H530`} stroke="#e5ebe5" strokeDasharray="4 5" />
-            <text x="6" y={y(max * p) + 4} fontSize="11" fill="#6b776f">
+            <path className="trend-grid" d={`M35 ${y(max * p)}H530`} strokeDasharray="4 5" />
+            <text className="trend-label" x="6" y={y(max * p) + 4} fontSize="11">
               {Math.round(max * p)}
             </text>
           </g>
         ))}
         <polyline
+          className="trend-line"
           points={values.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
-          fill="none"
-          stroke="#38634d"
           strokeWidth="2.5"
         />
         {values.map((v, i) => (
           <g key={i}>
-            <circle cx={x(i)} cy={y(v)} r="4" fill="#38634d" stroke="white" strokeWidth="2">
+            <circle className="trend-point" cx={x(i)} cy={y(v)} r="4" strokeWidth="2">
               <title>
                 {dateLabel(results[i].actualDate)}: {v} {results[i].unit}
               </title>
@@ -2398,15 +2270,17 @@ function ExerciseLogger({
       {grouped && (
         <div className="exercise-subheading">
           <h4>{e.name}</h4>
-          <button
-            className="text-link"
-            disabled={allComplete}
-            aria-label={`Check all ${e.name} sets`}
-            onClick={onCheckAll}
-          >
-            <CheckCheck size={15} />
-            Check all sets
-          </button>
+          {e.count > 1 && (
+            <button
+              className="text-link"
+              disabled={allComplete}
+              aria-label={`Check all ${e.name} sets`}
+              onClick={onCheckAll}
+            >
+              <CheckCheck size={15} />
+              Check all sets
+            </button>
+          )}
         </div>
       )}
       <div className="quick-sets" data-count={e.count} aria-label={`${e.name} sets`}>
