@@ -54,6 +54,7 @@ import {
   localDate,
   mergeEvents,
   mondayOf,
+  moveWorkout,
   resultEntries,
   setKey,
   streaks,
@@ -879,9 +880,7 @@ export default function TrainingApp({ user }: { user: User }) {
       return;
     }
     write(`schedule:${selected}`, {
-      due: moveDate,
-      originalDate: selected,
-      lateMove: selected < today || Boolean(latest(map, `schedule:${selected}`)?.lateMove),
+      ...moveWorkout(day, map, today, moveDate),
       movedAt: new Date().toISOString(),
     });
     setModal(null);
@@ -2266,9 +2265,9 @@ export default function TrainingApp({ user }: { user: User }) {
                     onChange={(e) => setMoveDate(e.target.value)}
                   />
                 </label>
-                {selected < today && (
+                {moveWorkout(day, map, today, moveDate).lateMove && (
                   <p className="settings-help">
-                    This was already a missed session. Moving it now keeps that missed day in your
+                    This workout was already missed. Moving it keeps the deadline it missed in your
                     consistency history.
                   </p>
                 )}

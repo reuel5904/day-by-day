@@ -14,6 +14,9 @@ const {
   latest,
   streaks,
   onTime,
+  deadline,
+  effectiveDate,
+  moveWorkout,
   mergeEvents,
   validateEvents,
   resultEntries,
@@ -129,6 +132,40 @@ test('Moving an already-missed workout does not erase its original deadline', ()
     event('s', 'session:' + d.date, { status: 'complete', actualDate: '2026-10-21' }),
   ];
   assert.equal(onTime(d, heads(events)), false);
+});
+test('Moving a workout again before its scheduled date passes keeps it on time', () => {
+  const d = days.find((d) => d.date === '2026-10-21');
+  const first = event(
+    'move1',
+    'schedule:' + d.date,
+    moveWorkout(d, heads([]), '2026-10-20', '2026-10-23'),
+  );
+  const second = event(
+    'move2',
+    'schedule:' + d.date,
+    moveWorkout(d, heads([first]), '2026-10-22', '2026-10-24'),
+    [first.id],
+  );
+  const done = event('done', 'session:' + d.date, { status: 'complete', actualDate: '2026-10-24' });
+  assert.equal(second.data.lateMove, false);
+  assert.equal(deadline(d, heads([first, second])), '2026-10-24');
+  assert.equal(onTime(d, heads([first, second, done])), true);
+});
+test('A workout missed twice keeps the first scheduled date it missed as its deadline', () => {
+  const d = days.find((d) => d.date === '2026-10-21');
+  const moves = [];
+  for (const [today, due] of [
+    ['2026-10-20', '2026-10-23'],
+    ['2026-10-25', '2026-10-27'],
+    ['2026-10-28', '2026-10-30'],
+  ]) {
+    const parents = moves.length ? [moves.at(-1).id] : [];
+    const data = moveWorkout(d, heads(moves), today, due);
+    moves.push(event('move' + moves.length, 'schedule:' + d.date, data, parents));
+  }
+  assert.equal(validateEvents(moves), true);
+  assert.equal(effectiveDate(d, heads(moves)), '2026-10-30');
+  assert.equal(deadline(d, heads(moves)), '2026-10-23');
 });
 test('Imported completion never creates measured performance or an assumed training date', () => {
   const events = [

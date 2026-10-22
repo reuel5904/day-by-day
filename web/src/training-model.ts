@@ -287,7 +287,25 @@ export const effectiveDate = (d: Day, map: Record<string, Event[]>) =>
   latest(map, `schedule:${d.date}`)?.due || d.date;
 export function deadline(d: Day, map: Record<string, Event[]>) {
   const s = latest(map, `schedule:${d.date}`);
-  return s?.lateMove ? d.date : s?.due || d.date;
+  if (!s) return d.date;
+  if (s.missedDeadline) return s.missedDeadline;
+  // Late moves recorded before missedDeadline existed fall back to the original date.
+  return s.lateMove ? d.date : s.due;
+}
+export function moveWorkout(d: Day, map: Record<string, Event[]>, today: string, due: string) {
+  const current = latest(map, `schedule:${d.date}`);
+  const scheduled = effectiveDate(d, map);
+  const missedDeadline = current?.lateMove
+    ? current.missedDeadline
+    : scheduled < today
+      ? scheduled
+      : undefined;
+  return {
+    due,
+    originalDate: d.date,
+    lateMove: Boolean(current?.lateMove) || scheduled < today,
+    ...(missedDeadline ? { missedDeadline } : {}),
+  };
 }
 export function onTime(d: Day, map: Record<string, Event[]>) {
   const s = latest(map, `session:${d.date}`);
@@ -355,7 +373,12 @@ export function validEventData(entity: string, data: any): boolean {
     );
   if (entity.startsWith('notes:')) return str(data.text, 10000);
   if (entity.startsWith('schedule:'))
-    return date(data.due) && date(data.originalDate) && typeof data.lateMove === 'boolean';
+    return (
+      date(data.due) &&
+      date(data.originalDate) &&
+      typeof data.lateMove === 'boolean' &&
+      (data.missedDeadline === undefined || date(data.missedDeadline))
+    );
   if (entity.startsWith('legacy:'))
     return (
       Array.isArray(data.checks) &&
