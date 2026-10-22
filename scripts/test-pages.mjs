@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 await build({
-  entryPoints: ['web/src/training-model.ts'],
+  entryPoints: ['web/src/training-model.ts', 'web/src/exercises.ts'],
   bundle: true,
   platform: 'node',
   format: 'esm',
-  outfile: '.work/model-test.mjs',
+  outdir: '.work/pages-test',
+  outExtension: { '.js': '.mjs' },
 });
 const {
   days,
-  parseBlock,
   heads,
   latest,
   streaks,
@@ -23,7 +23,8 @@ const {
   completionChanges,
   completionKey,
   isSetComplete,
-} = await import('../.work/model-test.mjs');
+} = await import('../.work/pages-test/training-model.mjs');
+const { EXERCISES } = await import('../.work/pages-test/exercises.mjs');
 let count = 0;
 function test(name, fn) {
   fn();
@@ -37,60 +38,109 @@ const event = (id, entity, data, parents = []) => ({
   parents,
   at: '2026-10-19T12:00:00.000Z',
 });
-test('Preserve all 90 dated sessions and raw prescriptions', () => {
+const sectionWith = (text) => days.flatMap((d) => d.sections).find((s) => s.text.startsWith(text));
+// What the original text parser produced for every workout up to Oct 22, as
+// "sectionExerciseId:sets:unit". Saved results are keyed by these IDs, so they must not change.
+const beforeConversion = {
+  '2026-10-13':
+    'b0e0:1:check b1e0:1:run b2e0:3:sec b3e0:2:sec b4e0:3:reps b5e0:3:reps b6e0:1:check',
+  '2026-10-14':
+    'b0e0:1:check b1e0:4:reps b2e0:3:reps b2e1:3:reps b3e0:3:reps b4e0:3:reps b4e1:3:reps',
+  '2026-10-15':
+    'b0e0:1:check b1e0:1:run b2e0:3:sec b3e0:2:sec b4e0:3:reps b5e0:3:reps b6e0:1:check',
+  '2026-10-16':
+    'b0e0:1:check b1e0:4:reps b2e0:3:reps b2e1:3:reps b3e0:3:reps b4e0:3:reps b4e1:3:reps b5e0:1:sec',
+  '2026-10-17': 'b0e0:1:run b1e0:1:check',
+  '2026-10-18': '',
+  '2026-10-19':
+    'b0e0:1:check b1e0:4:reps b2e0:3:reps b2e1:3:reps b3e0:3:reps b4e0:3:reps b4e1:3:reps',
+  '2026-10-20':
+    'b0e0:1:check b1e0:1:run b2e0:3:sec b3e0:3:sec b4e0:2:sec b5e0:3:reps b6e0:3:reps b7e0:1:check',
+  '2026-10-21':
+    'b0e0:1:check b1e0:4:reps b2e0:3:reps b2e1:3:reps b3e0:3:reps b4e0:3:reps b4e1:3:reps',
+  '2026-10-22':
+    'b0e0:1:check b1e0:1:run b2e0:3:sec b3e0:3:sec b4e0:2:sec b5e0:3:reps b6e0:3:reps b7e0:1:check',
+};
+test('Workouts up to Oct 22 keep the IDs, set counts and units their history uses', () => {
+  for (const [date, expected] of Object.entries(beforeConversion)) {
+    const d = days.find((d) => d.date === date);
+    const actual = d.sections
+      .flatMap((s) => s.exercises.map((e) => `${e.id}:${e.count}:${e.unit}`))
+      .join(' ');
+    assert.equal(actual, expected, date);
+  }
+});
+test('The program keeps all 90 dated days with their written prescriptions', () => {
   assert.equal(days.length, 90);
   assert.equal(days[0].date, '2026-10-13');
   assert.equal(days.at(-1).date, '2027-01-10');
   assert.equal(new Set(days.map((d) => d.date)).size, 90);
-  for (const d of days)
-    assert.deepEqual(
-      d.blocks.map((b) => b.raw),
-      d.items,
-    );
+  for (const d of days) for (const s of d.sections) assert.ok(s.text && s.exercises.length, d.date);
 });
-test('Exercise identity survives changed rep targets', () => {
-  const a = parseBlock('B. Superset ×3: Push-Ups 10 → Bulgarian Split Squats 6/leg · rest 90s', 0);
-  const b = parseBlock('B. Superset ×3: Push-Ups 12 → Bulgarian Split Squats 8/leg · rest 90s', 0);
-  assert.equal(a.exercises[0].name, b.exercises[0].name);
-  assert.equal(a.exercises[1].name, b.exercises[1].name);
-  assert.equal(a.exercises[1].sides, true);
-  assert.equal(a.rest, 90);
+test('Every exercise is on the shared exercise list', () => {
+  for (const d of days)
+    for (const s of d.sections)
+      for (const e of s.exercises) assert.ok(EXERCISES.includes(e.name), `${d.date} ${e.name}`);
 });
 test('Keep the unmatched extra push-up set', () => {
-  const b = days.find((d) => d.date === '2026-10-26').blocks[2];
-  assert.equal(b.exercises[0].count, 4);
-  assert.equal(b.exercises[1].count, 3);
+  const s = days.find((d) => d.date === '2026-10-26').sections[2];
+  assert.equal(s.exercises[0].count, 4);
+  assert.equal(s.exercises[1].count, 3);
 });
 test('Keep negative tempo separate from rep count', () => {
-  const b = parseBlock('C. Negative Pull-Ups: 3×2 @ 4s · rest 2 min', 0);
-  assert.equal(b.exercises[0].count, 3);
-  assert.equal(b.exercises[0].unit, 'reps');
-  assert.equal(b.exercises[0].target, '2');
-  assert.equal(b.exercises[0].tempo, '4s');
+  const [e] = sectionWith('C. Negative Pull-Ups: 3×2 @ 4s').exercises;
+  assert.equal(e.count, 3);
+  assert.equal(e.unit, 'reps');
+  assert.equal(e.target, '2');
+  assert.equal(e.tempo, '4s');
 });
 test('Split a max pull-up test from two easy back-off sets', () => {
-  const b = parseBlock('TEST: Pull-Ups, 1 max set. Log it. Then 2×3 easy · rest 2 min', 0);
-  assert.equal(b.exercises.length, 2);
-  assert.equal(b.exercises[0].count, 1);
-  assert.equal(b.exercises[1].count, 2);
-  assert.equal(b.exercises[1].target, '3');
+  const s = sectionWith('TEST: Pull-Ups, 1 max set.');
+  assert.equal(s.exercises.length, 2);
+  assert.equal(s.exercises[0].count, 1);
+  assert.equal(s.exercises[1].count, 2);
+  assert.equal(s.exercises[1].target, '3');
 });
 test('Final dead hang test is one hold, not three guessed sets', () => {
-  const b = parseBlock('TEST: Max Dead Hang. Log it + all 5 numbers. Compare to Oct 16.', 0);
-  assert.equal(b.exercises[0].count, 1);
-  assert.equal(b.exercises[0].name, 'Dead Hang');
-  assert.equal(b.exercises[0].unit, 'sec');
+  const [e] = sectionWith('TEST: Max Dead Hang.').exercises;
+  assert.equal(e.count, 1);
+  assert.equal(e.name, 'Dead Hang');
+  assert.equal(e.unit, 'sec');
 });
 test('Do not confuse strides with distance or a two-leg variation with unilateral work', () => {
-  const b = parseBlock('Run: 3 mi easy, then Strides 4×15s', 0);
-  assert.equal(b.exercises[0].unit, 'run');
-  assert.equal(b.exercises[1].unit, 'sec');
-  assert.equal(b.exercises[1].count, 4);
-  const g = parseBlock(
-    'D. Superset ×3: Pike chain 6-12 [Floor Pike] → Glute Bridge chain [two-leg 15-20 or single-leg 8-15/leg] · rest 90s',
-    0,
+  const run = sectionWith('Run: 3 mi easy, then Strides 4×15s');
+  assert.equal(run.exercises[0].unit, 'run');
+  assert.equal(run.exercises[1].unit, 'sec');
+  assert.equal(run.exercises[1].count, 4);
+  const bridge = sectionWith(
+    'D. Superset ×3: Pike chain 6-12 [Floor Pike] → Glute Bridge chain [two-leg',
   );
-  assert.equal(g.exercises[1].sides, false);
+  assert.equal(bridge.exercises[1].sides, false);
+});
+test('Every pull-up and chin-up day that offers 4×6-8 lets you choose it', () => {
+  const offers = days.flatMap((d) => d.sections).filter((s) => s.text.includes('4×6-8'));
+  assert.equal(offers.length, 15);
+  for (const s of offers)
+    assert.deepEqual(
+      s.alternatives.map((a) => a.count),
+      [5, 4],
+    );
+});
+test('Test week drops non-test core work to 2 sets', () => {
+  for (const date of ['2027-01-05', '2027-01-07']) {
+    const exercises = days.find((d) => d.date === date).sections.flatMap((s) => s.exercises);
+    for (const name of ['Dead Bug', 'Calf Raises'])
+      assert.equal(exercises.find((e) => e.name === name).count, 2, `${date} ${name}`);
+  }
+});
+test('Progression suggestions apply only to W1-W7 rep ranges, never to pull-ups or chin-ups', () => {
+  for (const d of days)
+    for (const s of d.sections)
+      for (const e of s.exercises.filter((e) => e.progression)) {
+        assert.match(d.code, /^W[1-7]$/);
+        assert.notEqual(e.top, null);
+        assert.doesNotMatch(e.name, /Pull-Ups|Chin-Ups/);
+      }
 });
 test('Concurrent offline edits remain conflicts until explicitly resolved', () => {
   const root = event('a', 'notes:2026-10-19', { text: 'old' });

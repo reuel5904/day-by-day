@@ -50,14 +50,19 @@ import {
   Exercise,
   formatTime,
   heads,
+  isRunDay,
   latest,
   localDate,
   mergeEvents,
   mondayOf,
   moveWorkout,
+  programAt,
+  programDays,
   resultEntries,
+  Section,
   setKey,
   streaks,
+  topOf,
   validateEvents,
 } from './training-model';
 
@@ -567,7 +572,14 @@ export default function TrainingApp({ user }: { user: User }) {
   const due = (d: Day) => effectiveDate(d, map);
   const session = latest(map, `session:${selected}`);
   const countFor = (e: Exercise) => latest(map, `config:${day.date}:${e.id}`)?.count || e.count;
-  const allSetKeys = day.blocks.flatMap((b) =>
+  const prescribed = (section: Section, e: Exercise): Exercise => {
+    const count = countFor(e);
+    const option = section.alternatives?.find((a) => a.count === count);
+    return option
+      ? { ...e, count, target: option.target, top: topOf(option.target) }
+      : { ...e, count };
+  };
+  const allSetKeys = day.sections.flatMap((b) =>
     b.exercises.flatMap((e) =>
       Array.from({ length: countFor(e) }, (_, i) => setKey(day.date, e, i)),
     ),
@@ -577,7 +589,7 @@ export default function TrainingApp({ user }: { user: User }) {
   const weekStart = mondayOf(selected);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const planned = days.filter(
-    (d) => d.items.length && due(d) >= weekStart && due(d) <= addDays(weekStart, 6),
+    (d) => d.sections.length && due(d) >= weekStart && due(d) <= addDays(weekStart, 6),
   );
   const completed = planned.filter((d) =>
     ['complete', 'legacy-complete'].includes(latest(map, `session:${d.date}`)?.status),
@@ -598,13 +610,17 @@ export default function TrainingApp({ user }: { user: User }) {
     .filter((r: any, i: number, list: any[]) => list.findIndex((x) => sameResult(x, r)) === i)
     .slice(0, 3);
   const originalChecks = latest(map, `legacy:${selected}`)?.checks || [];
-  const weekIndex = Array.from(new Set(days.map((d) => d.code))).indexOf(day.code) + 1;
+  const program = programAt(day.date);
+  const weekIndex = program.weeks.indexOf(day.code) + 1;
+  const currentProgram = programAt(today);
+  const programLength = programDays(currentProgram).length;
   const dayNumber = Math.max(
     1,
     Math.min(
-      90,
+      programLength,
       Math.round(
-        (new Date(today + 'T12:00:00').getTime() - new Date(days[0].date + 'T12:00:00').getTime()) /
+        (new Date(today + 'T12:00:00').getTime() -
+          new Date(currentProgram.start + 'T12:00:00').getTime()) /
           86400000,
       ) + 1,
     ),
@@ -630,25 +646,33 @@ export default function TrainingApp({ user }: { user: User }) {
     }
     return true;
   };
-  const afterSingleCompletion = (e: Exercise, i: number, block: any, wasComplete: boolean) => {
+  const afterSingleCompletion = (
+    e: Exercise,
+    i: number,
+    section: Section,
+    wasComplete: boolean,
+  ) => {
     stopAlarm();
     if (wasComplete || e.unit === 'check' || e.unit === 'run') return;
-    const other = block.exercises.filter((ex: Exercise) => ex.id !== e.id);
+    const other = section.exercises.filter((ex: Exercise) => ex.id !== e.id);
     const pairDone = other.every(
       (ex: Exercise) => i >= countFor(ex) || isSetComplete(map, setKey(day.date, ex, i)),
     );
     const hasNext = allSetKeys.some((k) => k !== setKey(day.date, e, i) && !isSetComplete(map, k));
-    if (hasNext && (block.kind !== 'superset' || pairDone)) {
-      const next = day.blocks
-        .flatMap((b) => b.exercises)
+    if (hasNext && (section.kind !== 'superset' || pairDone)) {
+      const next = day.sections
+        .flatMap((s) => s.exercises)
         .flatMap((ex) =>
           Array.from({ length: countFor(ex) }, (_, n) => ({ ex, n, key: setKey(day.date, ex, n) })),
         )
         .find((s) => s.key !== setKey(day.date, e, i) && !isSetComplete(map, s.key));
-      startRest(block.rest, next ? `Up next: ${next.ex.name} · set ${next.n + 1}` : 'Rest & reset');
+      startRest(
+        section.rest,
+        next ? `Up next: ${next.ex.name} · set ${next.n + 1}` : 'Rest & reset',
+      );
     }
   };
-  const toggleSet = (e: Exercise, i: number, block: any) => {
+  const toggleSet = (e: Exercise, i: number, section: Section) => {
     if (!validTrainingDate()) return;
     const k = setKey(day.date, e, i);
     if (map[k]?.length > 1 || map[completionKey(k)]?.length > 1) {
@@ -659,7 +683,7 @@ export default function TrainingApp({ user }: { user: User }) {
     const done = isSetComplete(map, k);
     write(completionKey(k), { completed: !done, day: selected, actualDate: loggingDate });
     setBulkUndo([]);
-    if (!done) afterSingleCompletion(e, i, block, false);
+    if (!done) afterSingleCompletion(e, i, section, false);
   };
   const checkAll = (keys: string[], label: string) => {
     if (!validTrainingDate()) return;
@@ -700,7 +724,7 @@ export default function TrainingApp({ user }: { user: User }) {
     setBulkUndo([]);
     notify('Bulk check undone. Your logged results are preserved.');
   };
-  const saveSet = (e: Exercise, i: number, data: any, block: any) => {
+  const saveSet = (e: Exercise, i: number, data: any, section: Section) => {
     if (!validTrainingDate()) return;
     const k = setKey(day.date, e, i);
     const wasComplete = isSetComplete(map, k);
@@ -724,7 +748,7 @@ export default function TrainingApp({ user }: { user: User }) {
         data: { completed: true, day: selected, actualDate: loggingDate },
       },
     ]);
-    afterSingleCompletion(e, i, block, wasComplete);
+    afterSingleCompletion(e, i, section, wasComplete);
   };
   const finish = () => {
     if (!actualDate || actualDate > today || actualDate < days[0].date) {
@@ -838,9 +862,9 @@ export default function TrainingApp({ user }: { user: User }) {
       </button>
     </>
   );
-  const totalComplete = days.filter(
+  const totalComplete = programDays(program).filter(
     (d) =>
-      d.items.length &&
+      d.sections.length &&
       ['complete', 'legacy-complete'].includes(latest(map, `session:${d.date}`)?.status),
   ).length;
   const trendNames = Array.from(
@@ -875,7 +899,7 @@ export default function TrainingApp({ user }: { user: User }) {
       }, {}),
   ).slice(0, 6);
   const reschedule = () => {
-    if (!moveDate || moveDate < today || moveDate > days.at(-1)!.date) {
+    if (!moveDate || moveDate < today || moveDate > program.end) {
       notify('Choose a date from today through the end of the program.');
       return;
     }
@@ -935,18 +959,16 @@ export default function TrainingApp({ user }: { user: User }) {
             <Flag size={19} />
           </div>
           <span className="eyebrow">THE BIG PICTURE</span>
-          <h3>Stronger by January.</h3>
-          <p>
-            Calisthenics + running.
-            <br />
-            One session at a time.
-          </p>
+          <h3>{currentProgram.title}.</h3>
+          <p>{currentProgram.summary}</p>
           <div className="program-bar">
-            <span style={{ width: `${(dayNumber / 90) * 100}%` }} />
+            <span style={{ width: `${(dayNumber / programLength) * 100}%` }} />
           </div>
           <div className="program-meta">
-            <span>Day {dayNumber} of 90</span>
-            <span>{Math.round((dayNumber / 90) * 100)}%</span>
+            <span>
+              Day {dayNumber} of {programLength}
+            </span>
+            <span>{Math.round((dayNumber / programLength) * 100)}%</span>
           </div>
           <span className="program-label">PROGRAM TIMELINE</span>
           <button className="text-link" onClick={() => setView('schedule')}>
@@ -1056,7 +1078,7 @@ export default function TrainingApp({ user }: { user: User }) {
                 </div>
                 <span className="phase-tag">
                   <span />
-                  WEEK {weekIndex} OF 13
+                  WEEK {weekIndex} OF {program.weeks.length}
                 </span>
               </div>
               <section className="week-strip" aria-label="Week navigation">
@@ -1080,7 +1102,7 @@ export default function TrainingApp({ user }: { user: User }) {
                     <button
                       key={date}
                       disabled={!d}
-                      className={`week-day ${sel ? 'selected' : ''} ${date === today ? 'is-today' : ''} ${d && !d.items.length ? 'planned-rest' : ''}`}
+                      className={`week-day ${sel ? 'selected' : ''} ${date === today ? 'is-today' : ''} ${d && !d.sections.length ? 'planned-rest' : ''}`}
                       title={
                         workouts.length > 1
                           ? `${workouts.length} sessions · tap again to switch`
@@ -1097,11 +1119,11 @@ export default function TrainingApp({ user }: { user: User }) {
                       <span>{dateLabel(date, { weekday: 'short' })}</span>
                       <strong>{dateLabel(date, { day: 'numeric' })}</strong>
                       <span
-                        className={`day-marker ${status === 'complete' || status === 'legacy-complete' ? 'done' : !d?.items.length ? 'rest' : d?.title.includes('Run') ? 'run' : 'strength'}`}
+                        className={`day-marker ${status === 'complete' || status === 'legacy-complete' ? 'done' : !d?.sections.length ? 'rest' : d && isRunDay(d) ? 'run' : 'strength'}`}
                       >
                         {status === 'complete' || status === 'legacy-complete' ? (
                           <Check size={10} />
-                        ) : !d?.items.length ? (
+                        ) : !d?.sections.length ? (
                           <>
                             <Leaf size={11} />
                             <span className="week-rest-label">Rest</span>
@@ -1134,7 +1156,7 @@ export default function TrainingApp({ user }: { user: User }) {
               )}
               <div className="workout-layout">
                 <div className="workout-column">
-                  <section className={`workout-hero ${!day.items.length ? 'rest-hero' : ''}`}>
+                  <section className={`workout-hero ${!day.sections.length ? 'rest-hero' : ''}`}>
                     <div className="hero-top">
                       <span className="pill">
                         <span />
@@ -1143,7 +1165,7 @@ export default function TrainingApp({ user }: { user: User }) {
                       <button
                         className="icon-button"
                         aria-label="Reschedule workout"
-                        disabled={!day.items.length || Boolean(session?.status)}
+                        disabled={!day.sections.length || Boolean(session?.status)}
                         onClick={() => {
                           setMoveDate(due(day) < today ? today : due(day));
                           setModal('move');
@@ -1155,27 +1177,27 @@ export default function TrainingApp({ user }: { user: User }) {
                     <div className="hero-content">
                       <div>
                         <h2>
-                          {!day.items.length
+                          {!day.sections.length
                             ? 'Recovery is progress.'
-                            : day.title.includes('Run') || day.title.includes('5K')
+                            : isRunDay(day)
                               ? day.title
                               : 'Strength day.'}
                         </h2>
                         <p>
-                          {!day.items.length
+                          {!day.sections.length
                             ? 'Rest, recharge, and come back ready.'
-                            : day.title.includes('Run') || day.title.includes('5K')
+                            : isRunDay(day)
                               ? 'Find your rhythm. Build your endurance.'
                               : 'Build a stronger foundation, one good rep at a time.'}
                         </p>
                         <div className="hero-details">
-                          {day.items.length > 0 && (
+                          {day.sections.length > 0 && (
                             <>
                               <span>
                                 <ListChecks size={15} />
                                 {
-                                  day.blocks
-                                    .flatMap((b) => b.exercises)
+                                  day.sections
+                                    .flatMap((s) => s.exercises)
                                     .filter((e) => e.unit !== 'check').length
                                 }{' '}
                                 exercises
@@ -1183,7 +1205,7 @@ export default function TrainingApp({ user }: { user: User }) {
                               <span>
                                 <Target size={15} />
                                 {allSetKeys.length -
-                                  day.blocks.filter((b) => b.kind === 'prep').length}{' '}
+                                  day.sections.filter((s) => s.kind === 'prep').length}{' '}
                                 sets
                               </span>
                             </>
@@ -1212,7 +1234,7 @@ export default function TrainingApp({ user }: { user: User }) {
                         <span className="art-orbit" />
                       </div>
                     </div>
-                    {day.items.length > 0 && (
+                    {day.sections.length > 0 && (
                       <div className="hero-bottom">
                         <span>
                           {session?.status === 'complete'
@@ -1241,20 +1263,6 @@ export default function TrainingApp({ user }: { user: User }) {
                       </div>
                     )}
                   </section>
-                  {day.code === 'W8' && day.title.includes('Strength') && (
-                    <div className="notice">
-                      <CircleHelp size={16} />
-                      The week note and exercise text use different deload targets. Original
-                      instructions are shown; automatic progression is off.
-                    </div>
-                  )}
-                  {day.code === 'W10' && day.title.includes('Core') && (
-                    <div className="notice">
-                      <CircleHelp size={16} />
-                      The week note says two sets, while some listed core work uses three. Original
-                      prescriptions are preserved; choose deliberately before training.
-                    </div>
-                  )}
                   {!!day.note && (
                     <div className="coach-note">
                       <BookOpen size={18} />
@@ -1264,7 +1272,7 @@ export default function TrainingApp({ user }: { user: User }) {
                       </p>
                     </div>
                   )}
-                  {day.items.length > 0 && selected !== today && (
+                  {day.sections.length > 0 && selected !== today && (
                     <label className="historical-date">
                       <span>
                         <CalendarDays size={16} />
@@ -1280,7 +1288,7 @@ export default function TrainingApp({ user }: { user: User }) {
                       />
                     </label>
                   )}
-                  {day.items.length > 0 && (
+                  {day.sections.length > 0 && (
                     <section id="exercise-list" className="exercise-section">
                       <div className="section-heading workout-list-heading">
                         <div>
@@ -1307,63 +1315,59 @@ export default function TrainingApp({ user }: { user: User }) {
                       <div className="session-progress">
                         <span style={{ width: `${percent}%` }} />
                       </div>
-                      {day.blocks.map((block, bi) => (
-                        <article className="exercise-card" key={selected + block.id}>
+                      {day.sections.map((section, si) => (
+                        <article className="exercise-card" key={selected + section.id}>
                           <div className="exercise-card-head">
                             <div
-                              className={`block-number ${block.exercises.every((e) => Array.from({ length: countFor(e) }, (_, i) => setKey(day.date, e, i)).every((k) => isSetComplete(map, k))) ? 'block-complete' : ''}`}
+                              className={`block-number ${section.exercises.every((e) => Array.from({ length: countFor(e) }, (_, i) => setKey(day.date, e, i)).every((k) => isSetComplete(map, k))) ? 'block-complete' : ''}`}
                             >
-                              {block.exercises.every((e) =>
+                              {section.exercises.every((e) =>
                                 Array.from({ length: countFor(e) }, (_, i) =>
                                   setKey(day.date, e, i),
                                 ).every((k) => isSetComplete(map, k)),
                               ) ? (
                                 <Check size={17} />
                               ) : (
-                                String(bi + 1).padStart(2, '0')
+                                String(si + 1).padStart(2, '0')
                               )}
                             </div>
                             <div>
                               <span className="eyebrow">
-                                {block.kind === 'superset'
-                                  ? `${Math.min(...block.exercises.map(countFor))} ROUNDS · SUPERSET`
-                                  : block.kind === 'prep'
+                                {section.kind === 'superset'
+                                  ? `${Math.min(...section.exercises.map(countFor))} ROUNDS · SUPERSET`
+                                  : section.kind === 'prep'
                                     ? 'PREPARE & RECOVER'
-                                    : block.kind === 'run'
+                                    : section.kind === 'run'
                                       ? 'ENDURANCE'
                                       : 'QUALITY OVER QUANTITY'}
                               </span>
-                              <h3>
-                                {block.kind === 'superset'
-                                  ? block.exercises.map((e) => e.name).join(' + ')
-                                  : block.name}
-                              </h3>
+                              <h3>{section.name}</h3>
                             </div>
-                            {block.rest > 0 && (
+                            {section.rest > 0 && (
                               <button
                                 className="rest-chip"
-                                onClick={() => startRest(block.rest, block.name)}
+                                onClick={() => startRest(section.rest, section.name)}
                               >
                                 <Timer size={13} />
-                                {formatTime(block.rest)}
+                                {formatTime(section.rest)}
                               </button>
                             )}
                             <button
                               className="section-check-all"
-                              aria-label={`Check all in ${block.kind === 'superset' ? 'superset' : block.name} section`}
-                              disabled={block.exercises.every((e) =>
+                              aria-label={`Check all in ${section.kind === 'superset' ? 'superset' : section.name} section`}
+                              disabled={section.exercises.every((e) =>
                                 Array.from({ length: countFor(e) }, (_, i) =>
                                   setKey(day.date, e, i),
                                 ).every((k) => isSetComplete(map, k)),
                               )}
                               onClick={() =>
                                 checkAll(
-                                  block.exercises.flatMap((e) =>
+                                  section.exercises.flatMap((e) =>
                                     Array.from({ length: countFor(e) }, (_, i) =>
                                       setKey(day.date, e, i),
                                     ),
                                   ),
-                                  block.kind === 'superset' ? 'Section' : block.name,
+                                  section.kind === 'superset' ? 'Section' : section.name,
                                 )
                               }
                             >
@@ -1372,47 +1376,45 @@ export default function TrainingApp({ user }: { user: User }) {
                             </button>
                           </div>
                           <div className="prescription">
-                            {block.raw}
-                            {originalChecks[bi] && (
+                            {section.text}
+                            {originalChecks[si] && (
                               <span className="legacy-tag">
                                 <Check size={12} />
                                 Previously checked · imported
                               </span>
                             )}
                           </div>
-                          {block.alternatives && (
+                          {section.alternatives && (
                             <label className="alternative-choice">
-                              Follow the plan’s set option
+                              Follow the program’s set option
                               <select
-                                value={countFor(block.exercises[0])}
+                                value={countFor(section.exercises[0])}
                                 onChange={(e) =>
-                                  write(`config:${day.date}:${block.exercises[0].id}`, {
+                                  write(`config:${day.date}:${section.exercises[0].id}`, {
                                     count: +e.target.value,
                                   })
                                 }
                               >
-                                <option value={5}>5 sets × 2–5 reps</option>
-                                <option value={4}>4 sets × 6–8 reps</option>
+                                {section.alternatives.map((option) => (
+                                  <option key={option.count} value={option.count}>
+                                    {option.count} sets × {option.target.replace('-', '–')} reps
+                                  </option>
+                                ))}
                               </select>
                             </label>
                           )}
-                          {block.exercises.map((e) => (
+                          {section.exercises.map((e) => (
                             <ExerciseLogger
                               key={selected + e.id}
-                              exercise={{
-                                ...e,
-                                count: countFor(e),
-                                target: block.alternatives && countFor(e) === 4 ? '6-8' : e.target,
-                                top: block.alternatives && countFor(e) === 4 ? 8 : e.top,
-                              }}
+                              exercise={prescribed(section, e)}
                               day={day}
                               map={map}
                               previous={previous}
-                              onSave={(i, data) => saveSet(e, i, data, block)}
+                              onSave={(i, data) => saveSet(e, i, data, section)}
                               write={write}
                               notify={notify}
                               results={results}
-                              onToggle={(i) => toggleSet(e, i, block)}
+                              onToggle={(i) => toggleSet(e, i, section)}
                               onCheckAll={() =>
                                 checkAll(
                                   Array.from({ length: countFor(e) }, (_, i) =>
@@ -1648,11 +1650,14 @@ export default function TrainingApp({ user }: { user: User }) {
             <>
               <div className="page-heading">
                 <div>
-                  <span className="eyebrow">OCT 13, 2026 — JAN 10, 2027</span>
+                  <span className="eyebrow">
+                    {dateLabel(program.start, { month: 'short', day: 'numeric', year: 'numeric' })}{' '}
+                    — {dateLabel(program.end, { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
                   <h1>
-                    Your plan. <span>Day by day.</span>
+                    {program.title}. <span>Day by day.</span>
                   </h1>
-                  <p>A stronger foundation, a 5K finish, and all the days in between.</p>
+                  <p>{program.summary}</p>
                 </div>
                 <button className="secondary" onClick={() => chooseDay(firstToday())}>
                   Jump to today
@@ -1662,16 +1667,17 @@ export default function TrainingApp({ user }: { user: User }) {
               <div className="schedule-intro">
                 <Flag size={23} />
                 <div>
-                  <strong>90 days of building something.</strong>
+                  <strong>{programDays(program).length} days of building something.</strong>
                   <p>
-                    {totalComplete} workouts completed · Scheduled rest every Sunday · 5K on January
-                    9
+                    {totalComplete} of{' '}
+                    {programDays(program).filter((d) => d.sections.length).length} workouts
+                    completed · {program.note}
                   </p>
                 </div>
               </div>
               <div className="schedule-weeks">
-                {Array.from(new Set(days.map((d) => d.code))).map((code, wi) => {
-                  const list = days.filter((d) => d.code === code);
+                {program.weeks.map((code) => {
+                  const list = programDays(program).filter((d) => d.code === code);
                   return (
                     <details className="schedule-week" key={code} open={code === day.code}>
                       <summary>
@@ -1692,7 +1698,7 @@ export default function TrainingApp({ user }: { user: User }) {
                           return (
                             <button
                               key={d.date}
-                              className={`schedule-day ${!d.items.length ? 'rest-day' : ''} ${due(d) === today ? 'current-day' : ''}`}
+                              className={`schedule-day ${!d.sections.length ? 'rest-day' : ''} ${due(d) === today ? 'current-day' : ''}`}
                               onClick={() => chooseDay(d.date)}
                             >
                               <span className="schedule-date">
@@ -1700,11 +1706,11 @@ export default function TrainingApp({ user }: { user: User }) {
                                 <strong>{dateLabel(due(d), { day: 'numeric' })}</strong>
                               </span>
                               <span
-                                className={`schedule-kind ${!d.items.length ? 'recovery' : d.title.includes('Run') ? 'running' : 'strength'}`}
+                                className={`schedule-kind ${!d.sections.length ? 'recovery' : isRunDay(d) ? 'running' : 'strength'}`}
                               >
-                                {!d.items.length ? (
+                                {!d.sections.length ? (
                                   <Leaf size={19} />
-                                ) : d.title.includes('Run') || d.title.includes('5K') ? (
+                                ) : isRunDay(d) ? (
                                   <Footprints size={19} />
                                 ) : (
                                   <Dumbbell size={19} />
@@ -1714,7 +1720,7 @@ export default function TrainingApp({ user }: { user: User }) {
                                 <strong>{d.title}</strong>
                                 <span>
                                   {due(d) !== d.date ? `Moved from ${dateLabel(d.date)} · ` : ''}
-                                  {!d.items.length
+                                  {!d.sections.length
                                     ? 'Recovery is part of the plan'
                                     : status === 'complete'
                                       ? 'Workout complete'
@@ -1726,7 +1732,7 @@ export default function TrainingApp({ user }: { user: User }) {
                                             ? 'Not completed'
                                             : due(d) === today
                                               ? 'Today’s session'
-                                              : `${d.blocks.length} blocks`}
+                                              : `${d.sections.length} sections`}
                                 </span>
                               </span>
                               {status === 'complete' || status === 'legacy-complete' ? (
@@ -2261,7 +2267,7 @@ export default function TrainingApp({ user }: { user: User }) {
                     type="date"
                     value={moveDate}
                     min={today}
-                    max={days.at(-1)!.date}
+                    max={program.end}
                     onChange={(e) => setMoveDate(e.target.value)}
                   />
                 </label>
@@ -2376,12 +2382,10 @@ function ExerciseLogger({
   );
   const allComplete = completed.every(Boolean);
   const grouped =
-    (day.blocks.find((b) => b.exercises.some((x) => x.id === e.id))?.exercises.length || 0) > 1;
+    (day.sections.find((s) => s.exercises.some((x) => x.id === e.id))?.exercises.length || 0) > 1;
   const canSuggest =
+    e.progression &&
     e.top !== null &&
-    !e.ambiguous &&
-    !/^(R|W8|W10)/.test(day.code) &&
-    !/Pull-Ups|Chin-Ups/.test(e.name) &&
     recorded.every(
       (r, i) =>
         completed[i] &&
@@ -2572,13 +2576,6 @@ function ExerciseLogger({
               />
             ))}
           </div>
-          {e.ambiguous && (
-            <p className="ambiguity-note">
-              <CircleHelp size={14} />
-              The original prescription has alternatives. Log what you performed; progression
-              suggestions are off here.
-            </p>
-          )}
         </div>
       )}
       {canSuggest && (

@@ -41,7 +41,7 @@ Fixed numbers. Don't add reps.
 - B. Superset ×3: Push-Ups 10 → Bulgarian Split Squats 6/leg · rest 90s
 - C. Negative Pull-Ups: 3×2 @ 3s · rest 2 min
 - D. Superset ×3: Pike Push-Ups 5 → Glute Bridge 12 · rest 90s
-- **Max Dead Hang: 1× max. Log it + all 5 numbers.**
+- **Max Dead Hang: 1× max. Log it.**
 
 **Sat Oct 17 · Long Run**
 
@@ -99,7 +99,7 @@ Fixed numbers. Don't add reps.
 - B. Superset ×3: Push-Ups 12 → Bulgarian Split Squats 8/leg · rest 90s
 - C. Negative Pull-Ups: 3×2 @ 4s · rest 2 min
 - D. Superset ×3: Pike Push-Ups 7 → Glute Bridge 15 · rest 90s
-- **Max Dead Hang: 1× max. Log it + all 5 numbers.**
+- **Max Dead Hang: 1× max. Log it.**
 
 **Sat Oct 24 · Long Run**
 
@@ -157,7 +157,7 @@ Fixed numbers. Last ramp week.
 - B. Superset ×3: Push-Ups 12 → Bulgarian Split Squats 10/leg · rest 90s, then 1 more set of Push-Ups 12
 - C. Negative Pull-Ups: 3×3 @ 4s · rest 2 min
 - D. Superset ×3: Pike Push-Ups 8 → Glute Bridge 20 · rest 90s
-- **Max Dead Hang: 1× max. Log it + all 5 numbers.**
+- **Max Dead Hang: 1× max. Log it.**
 
 **Sat Oct 31 · Long Run**
 
@@ -207,7 +207,7 @@ Rep ranges start now. Hit the top of the range on every set = advance next sessi
 - B. Superset ×3: Push chain 8-15 \[Push-Ups\] → Squat chain 8-15/leg \[Bulgarian\] · rest 90s
 - C. Negative Pull-Ups: 3×3 @ 5s · rest 2 min
 - D. Superset ×3: Pike chain 6-12 \[Floor Pike\] → Glute Bridge chain 15-20 \[two-leg\] · rest 90s
-- **Max Dead Hang: 1× max. Log it + all 5 numbers.**
+- **Max Dead Hang: 1× max. Log it.**
 
 **Sat Nov 7 · Long Run**
 
@@ -257,7 +257,7 @@ Push-ups may advance to decline (feet on chair) this week. Clean top-of-range re
 - B. Superset ×3: Push chain 8-15 \[Push-Ups or Decline\] → Squat chain 8-15/leg \[Bulgarian\] · rest 90s
 - C. Negative Pull-Ups: 3×3 @ 5s · rest 2 min
 - D. Superset ×3: Pike chain 6-12 \[Floor Pike\] → Glute Bridge chain 15-20 \[two-leg\] · rest 90s
-- **Max Dead Hang: 1× max. Log it + all 5 numbers.**
+- **Max Dead Hang: 1× max. Log it.**
 
 **Sat Nov 14 · Long Run**
 
@@ -307,7 +307,7 @@ Pull-ups at 5×5 clean on all three days? Switch to 4×6-8 next week. Tuesday st
 - B. Superset ×3: Push chain 8-15 \[Decline\] → Squat chain 8-15/leg \[Bulgarian\] · rest 90s
 - C. Negative Pull-Ups: 3×3 @ 6s · rest 2 min
 - D. Superset ×3: Pike chain 6-12 \[Floor Pike\] → Glute Bridge chain \[two-leg or single-leg\] · rest 90s
-- **Max Dead Hang: 1× max. Log it + all 5 numbers.**
+- **Max Dead Hang: 1× max. Log it.**
 
 **Sat Nov 21 · Long Run**
 
@@ -357,7 +357,7 @@ Bulgarians at 3×15/leg clean? Move to Tempo Bulgarian (3s down, 1s pause).
 - B. Superset ×3: Push chain 8-15 \[Decline\] → Squat chain \[Bulgarian or Tempo Bulgarian\] · rest 90s
 - C. Negative Pull-Ups: 3×3 @ 7s · rest 2 min
 - D. Superset ×3: Pike chain 6-12 \[Floor Pike\] → Glute Bridge chain \[Single-Leg\] · rest 90s
-- **Max Dead Hang: 1× max. Log it + all 5 numbers.**
+- **Max Dead Hang: 1× max. Log it.**
 
 **Sat Nov 28 · Long Run**
 
@@ -407,7 +407,7 @@ Archer push-ups may enter here: 5-10/side, full range on the working arm.
 - B. Superset ×3: Push chain \[Decline or Archer\] → Squat chain \[Tempo Bulgarian\] · rest 90s
 - C. Negative Pull-Ups: 3×3 @ 8s · rest 2 min
 - D. Superset ×3: Pike chain 6-12 \[Floor Pike\] → Glute Bridge chain \[Single-Leg\] · rest 90s
-- **Max Dead Hang: 1× max. Log it + all 5 numbers.**
+- **Max Dead Hang: 1× max. Log it.**
 
 **Sat Dec 5 · Long Run**
 
@@ -457,7 +457,7 @@ Hold the 8s negative and master it. Everything else keeps progressing.
 - B. Superset ×3: Push chain \[Archer\] → Squat chain \[Tempo Bulgarian\] · rest 90s
 - C. Negative Pull-Ups: 3×3 @ 8s (hold) · rest 2 min
 - D. Superset ×3: Pike chain 6-12 \[Floor Pike\] → Glute Bridge chain \[Single-Leg\] · rest 90s
-- **Max Dead Hang: 1× max. Log it + all 5 numbers.**
+- **Max Dead Hang: 1× max. Log it.**
 
 **Sat Dec 12 · Long Run**
 
@@ -507,7 +507,7 @@ Floor pike at 3×12 clean? Feet go on the chair. Hardest week before the deload.
 - B. Superset ×3: Push chain \[Archer\] → Squat chain \[Tempo Bulgarian or Chair-assisted Pistol\] · rest 90s
 - C. Negative Pull-Ups: 3×3 @ 9s · rest 2 min
 - D. Superset ×3: Pike chain \[Floor or Feet-on-chair\] → Glute Bridge chain \[Single-Leg, or foot on chair\] · rest 90s
-- **Max Dead Hang: 1× max. Log it + all 5 numbers.**
+- **Max Dead Hang: 1× max. Log it.**
 
 **Sat Dec 19 · Long Run**
 
@@ -518,7 +518,7 @@ Floor pike at 3×12 clean? Feet go on the chair. Hardest week before the deload.
 
 ## W8 · Dec 21-27 · Deload (Christmas week)
 
-2 sets on every exercise, stop 2 reps shy of the top, and stay on the same variation as W7. No strides.
+2 sets on every exercise and stay on the same variation as W7. Pull-ups and chin-ups: stop 2 reps shy of your best. Everything else: stop 2 reps shy of the top of its range. No strides.
 
 **Mon Dec 21 · Strength (deload)**
 
@@ -557,7 +557,7 @@ Floor pike at 3×12 clean? Feet go on the chair. Hardest week before the deload.
 - B. Superset ×2: Push chain → Squat chain · rest 90s
 - C. Negative Pull-Ups: 2×3 @ 6s · rest 2 min
 - D. Superset ×2: Pike chain → Glute Bridge chain · rest 90s
-- **Max Dead Hang: 1× max. Log it + all 5 numbers.**
+- **Max Dead Hang: 1× max. Log it.**
 
 **Sat Dec 26 · Long Run (deload)**
 
@@ -607,7 +607,7 @@ Back to 3 sets after the deload. Don't add anything. Saturday is your 4-mile run
 - B. Superset ×3: Push chain → Squat chain · rest 90s
 - C. Negative Pull-Ups: 3×3 @ 10s · rest 2 min
 - D. Superset ×3: Pike chain → Glute Bridge chain · rest 90s
-- **Max Dead Hang: 1× max. Log it + all 5 numbers.**
+- **Max Dead Hang: 1× max. Log it.**
 
 **Sat Jan 2 · Long Run**
 
@@ -633,7 +633,7 @@ Tests come first while you're fresh. Everything else drops to 2 sets. No negativ
 - Run: **2 mi** easy
 - **TEST: Full Hollow 3×20-30s** (low back flat or the set ends)
 - **TEST: L-Sit 3×15-20s**
-- Side Plank (raised foot): 2×45s/side · Dead Bug: 3×12/side slow · Single-Leg Calf Raises: 3×20/leg
+- Side Plank (raised foot): 2×45s/side · Dead Bug: 2×12/side slow · Single-Leg Calf Raises: 2×20/leg
 - Cool-down: Hip Flexor Stretch 2×30s/side
 
 **Wed Jan 6 · Strength + Chin-Up and Pistol Tests**
@@ -649,7 +649,7 @@ Tests come first while you're fresh. Everything else drops to 2 sets. No negativ
 - Warm-up: Pelvic Tilts 2×10, Cat-Cow 1×10
 - Run: **2 mi** easy
 - Full Hollow 3×20-30s and L-Sit 3×15-20s again. Best of Tue/Thu counts.
-- Side Plank (raised foot): 2×45s/side · Dead Bug: 3×12/side slow · Single-Leg Calf Raises: 3×20/leg
+- Side Plank (raised foot): 2×45s/side · Dead Bug: 2×12/side slow · Single-Leg Calf Raises: 2×20/leg
 - Cool-down: Hip Flexor Stretch 2×30s/side
 
 **Fri Jan 8 · Strength + Final Numbers (last session)**
@@ -658,7 +658,7 @@ Tests come first while you're fresh. Everything else drops to 2 sets. No negativ
 - Pull-Ups: 2×3 easy (save grip) · rest 2 min
 - B. Superset ×2: Push chain → Squat chain · rest 90s
 - D. Superset ×2: Pike chain → Glute Bridge chain · rest 90s
-- **TEST: Max Dead Hang. Log it + all 5 numbers. Compare to Oct 16.**
+- **TEST: Max Dead Hang. Log it and compare to Oct 16.**
 
 **Sat Jan 9 · 5K Victory Lap**
 

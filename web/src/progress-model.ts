@@ -6,10 +6,13 @@ import {
   isSetComplete,
   latest,
   mondayOf,
+  programAt,
+  programDays,
   resultEntries,
   setKey,
   type Day,
   type Event,
+  type Program,
 } from './training-model';
 
 type History = Record<string, Event[]>;
@@ -17,9 +20,9 @@ export const isFinished = (status?: string) =>
   status === 'complete' || status === 'legacy-complete';
 
 export function completedKeys(day: Day, map: History) {
-  return day.blocks
-    .flatMap((block) =>
-      block.exercises.flatMap((exercise) =>
+  return day.sections
+    .flatMap((section) =>
+      section.exercises.flatMap((exercise) =>
         Array.from(
           { length: latest(map, `config:${day.date}:${exercise.id}`)?.count || exercise.count },
           (_, i) => ({ key: setKey(day.date, exercise, i), unit: exercise.unit }),
@@ -30,7 +33,7 @@ export function completedKeys(day: Day, map: History) {
 }
 
 export function trainingStatus(day: Day, map: History, today: string) {
-  if (!day.items.length) return { id: 'rest', label: 'Planned rest' };
+  if (!day.sections.length) return { id: 'rest', label: 'Planned rest' };
   if (map[`session:${day.date}`]?.length > 1)
     return { id: 'conflict', label: 'Review conflicting edits' };
   const status = latest(map, `session:${day.date}`)?.status;
@@ -47,7 +50,7 @@ export function trainingStatus(day: Day, map: History, today: string) {
 
 export function calendarDay(date: string, map: History, today: string) {
   const scheduled = days.filter((day) => effectiveDate(day, map) === date);
-  const workouts = scheduled.filter((day) => day.items.length);
+  const workouts = scheduled.filter((day) => day.sections.length);
   const statuses = (workouts.length ? workouts : scheduled).map((day) =>
     trainingStatus(day, map, today),
   );
@@ -73,8 +76,9 @@ export function calendarDay(date: string, map: History, today: string) {
   return { status, target, workoutCount: workouts.length };
 }
 
-export function progressSummary(map: History, today: string) {
-  const training = days.filter((day) => day.items.length);
+export function progressSummary(map: History, today: string, program: Program = programAt(today)) {
+  const own = programDays(program);
+  const training = own.filter((day) => day.sections.length);
   const finished = training.filter((day) => {
     const session = latest(map, `session:${day.date}`);
     return isFinished(session?.status) && (!session.actualDate || session.actualDate <= today);
@@ -93,10 +97,18 @@ export function progressSummary(map: History, today: string) {
       }
     }
   }
-  const measured = resultEntries(map).filter((result) => result.actualDate <= today);
+  const measured = resultEntries(map).filter(
+    (result) => result.actualDate <= today && own.some((day) => day.date === result.day),
+  );
   for (const result of measured) activeDates.add(result.actualDate);
-  const weeks = Array.from({ length: 13 }, (_, i) => {
-    const start = addDays(mondayOf(days[0].date), i * 7),
+  const firstMonday = mondayOf(program.start);
+  const weekCount =
+    Math.round(
+      (Date.parse(mondayOf(program.end) + 'T12:00:00') - Date.parse(firstMonday + 'T12:00:00')) /
+        (7 * 86400000),
+    ) + 1;
+  const weeks = Array.from({ length: weekCount }, (_, i) => {
+    const start = addDays(firstMonday, i * 7),
       end = addDays(start, 6);
     const planned = training.filter(
       (day) => effectiveDate(day, map) >= start && effectiveDate(day, map) <= end,
@@ -116,12 +128,13 @@ export function progressSummary(map: History, today: string) {
     activeDays: activeDates.size,
     weeks,
     thisWeek: weeks.find((week) => week.start === mondayOf(today)),
-    strength: finished.filter((day) => !day.blocks.some((block) => block.kind === 'run')).length,
-    runs: finished.filter((day) => day.blocks.some((block) => block.kind === 'run')).length,
+    strength: finished.filter((day) => !day.sections.some((section) => section.kind === 'run'))
+      .length,
+    runs: finished.filter((day) => day.sections.some((section) => section.kind === 'run')).length,
     partial: training.filter((day) => latest(map, `session:${day.date}`)?.status === 'partial')
       .length,
     inProgress: training.filter((day) => trainingStatus(day, map, today).id === 'started').length,
-    restDays: days.filter((day) => !day.items.length && effectiveDate(day, map) <= today).length,
+    restDays: own.filter((day) => !day.sections.length && effectiveDate(day, map) <= today).length,
     distance: measured
       .filter((result) => result.unit === 'run')
       .reduce((sum, result) => sum + result.value, 0),

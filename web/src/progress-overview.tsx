@@ -1,5 +1,5 @@
 import { CalendarDays, Check, Dumbbell, Flame, Footprints, Leaf, ListChecks } from 'lucide-react';
-import { addDays, dateLabel, days, type Event } from './training-model';
+import { addDays, dateLabel, programAt, type Event } from './training-model';
 import { calendarDay, progressSummary } from './progress-model';
 
 export default function ProgressOverview({
@@ -13,7 +13,8 @@ export default function ProgressOverview({
   streak: { current: number; best: number };
   onChoose: (date: string) => void;
 }) {
-  const summary = progressSummary(map, today);
+  const program = programAt(today);
+  const summary = progressSummary(map, today, program);
   const stats = [
     {
       label: 'Completed workouts',
@@ -142,12 +143,14 @@ export default function ProgressOverview({
             <span className="eyebrow">TRAINING AND RECOVERY</span>
             <h2>Your training rhythm</h2>
           </div>
-          <span>Oct 13 — Jan 10</span>
+          <span>
+            {dateLabel(program.start)} — {dateLabel(program.end)}
+          </span>
         </div>
         <div className="recovery-note">
           <Leaf size={20} />
           <div>
-            <strong>Sundays are planned rest.</strong>
+            <strong>Rest days are part of the program.</strong>
             <p>
               Marked automatically. No check-in needed, and your streak carries through.{' '}
               {summary.restDays} planned rest {summary.restDays === 1 ? 'day has' : 'days have'}{' '}
@@ -168,7 +171,7 @@ export default function ProgressOverview({
                 <span className="rhythm-week-label">{dateLabel(week.start)}</span>
                 {Array.from({ length: 7 }, (_, i) => {
                   const date = addDays(week.start, i);
-                  if (date < days[0].date || date > days.at(-1)!.date)
+                  if (date < program.start || date > program.end)
                     return <span className="rhythm-placeholder" key={date} />;
                   const { status, target, workoutCount } = calendarDay(date, map, today);
                   return (

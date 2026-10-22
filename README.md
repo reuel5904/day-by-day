@@ -49,7 +49,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5174/day-by-day/`. Authored client code is in `web/src/`; `web/index.html` is the Vite entry point. The app reads the program from `web/src/routine.ts`; `routine.md` is the original roadmap it came from.
+Open `http://127.0.0.1:5174/day-by-day/`. Authored client code is in `web/src/`; `web/index.html` is the Vite entry point. Each program lives in `web/src/programs/<start date>/`: `program.ts` is its structured data and `roadmap.md` the roadmap it was converted from. `web/src/exercises.ts` lists the exercise names every program uses.
 
 ```sh
 npm run format:check   # npm run format fixes it
