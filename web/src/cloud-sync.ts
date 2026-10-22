@@ -4,11 +4,22 @@ import type { Store } from './sync-store';
 
 export async function uploadEvents(client: SupabaseClient, userId: string, events: Event[]) {
   if (!events.length) return;
-  if (!validateEvents(events)) throw new Error('Invalid training records. Export a backup before retrying.');
-  const { error } = await client.from('training_events').upsert(
-    events.map(event => ({ user_id: userId, id: event.id, entity: event.entity, parents: event.parents, data: event.data, at: event.at })),
-    { onConflict: 'user_id,id', ignoreDuplicates: true },
-  ).abortSignal(AbortSignal.timeout(20000));
+  if (!validateEvents(events))
+    throw new Error('Invalid training records. Export a backup before retrying.');
+  const { error } = await client
+    .from('training_events')
+    .upsert(
+      events.map((event) => ({
+        user_id: userId,
+        id: event.id,
+        entity: event.entity,
+        parents: event.parents,
+        data: event.data,
+        at: event.at,
+      })),
+      { onConflict: 'user_id,id', ignoreDuplicates: true },
+    )
+    .abortSignal(AbortSignal.timeout(20000));
   if (error) throw error;
 }
 
@@ -16,11 +27,17 @@ export async function downloadEvents(client: SupabaseClient, userId: string): Pr
   const events: Event[] = [];
   let after: string | undefined;
   for (;;) {
-    let query = client.from('training_events').select('id,entity,parents,data,at').eq('user_id', userId).order('id').limit(1000);
+    let query = client
+      .from('training_events')
+      .select('id,entity,parents,data,at')
+      .eq('user_id', userId)
+      .order('id')
+      .limit(1000);
     if (after) query = query.gt('id', after);
     const { data, error } = await query.abortSignal(AbortSignal.timeout(20000));
     if (error) throw error;
-    if (!validateEvents(data)) throw new Error('Could not validate cloud history. Local history is safe.');
+    if (!validateEvents(data))
+      throw new Error('Could not validate cloud history. Local history is safe.');
     events.push(...data);
     if (events.length > 30000) throw new Error('History is too large to sync. Export a backup.');
     if (data.length < 1000) return events;
@@ -44,10 +61,13 @@ export async function syncHistory(options: {
   for (let offset = 0; offset < pending.length; offset += 100) {
     if (!active()) return;
     const batchIds = new Set(pending.slice(offset, offset + 100));
-    const events = read().events.filter(event => batchIds.has(event.id));
+    const events = read().events.filter((event) => batchIds.has(event.id));
     await uploadEvents(client, userId, events);
     if (!active()) return;
-    save(read(), events.map(event => event.id));
+    save(
+      read(),
+      events.map((event) => event.id),
+    );
   }
   if (!active()) return;
   const remote = await downloadEvents(client, userId);

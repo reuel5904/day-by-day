@@ -1,12 +1,15 @@
 import { readdir, readFile, writeFile, cp, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-const root=new URL('../',import.meta.url),dist=new URL('../dist/',import.meta.url);
-const index=await readFile(new URL('index.html',dist),'utf8');
-if(!index.includes('/day-by-day/assets/'))throw new Error('Missing repository base path in build output.');
-const version=createHash('sha256').update(index).digest('hex').slice(0,12);
-const sw=(await readFile(new URL('sw.js',dist),'utf8')).replace('BUILD_VERSION',version);
-await writeFile(new URL('sw.js',dist),sw);
-await rm(new URL('assets/',root),{recursive:true,force:true});
-for(const entry of await readdir(dist))await cp(new URL(entry,dist),new URL(entry,root),{recursive:true});
-await writeFile(new URL('.nojekyll',root),'');
+const root = new URL('../', import.meta.url),
+  dist = new URL('../dist/', import.meta.url);
+const index = await readFile(new URL('index.html', dist), 'utf8');
+if (!index.includes('/day-by-day/assets/'))
+  throw new Error('Missing repository base path in build output.');
+const version = createHash('sha256').update(index).digest('hex').slice(0, 12);
+const sw = (await readFile(new URL('sw.js', dist), 'utf8')).replace('BUILD_VERSION', version);
+await writeFile(new URL('sw.js', dist), sw);
+await rm(new URL('assets/', root), { recursive: true, force: true });
+for (const entry of await readdir(dist))
+  await cp(new URL(entry, dist), new URL(entry, root), { recursive: true });
+await writeFile(new URL('.nojekyll', root), '');
 console.log('Built for the existing GitHub Pages main / publishing source.');

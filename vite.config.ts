@@ -6,5 +6,5 @@ export default defineConfig({
   base: '/day-by-day/',
   plugins: [react()],
   publicDir: 'public',
-  build: { outDir: fileURLToPath(new URL('./dist',import.meta.url)), emptyOutDir: true },
+  build: { outDir: fileURLToPath(new URL('./dist', import.meta.url)), emptyOutDir: true },
 });
