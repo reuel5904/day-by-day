@@ -924,7 +924,7 @@ export default function TrainingApp({ user }: { user: User }) {
   const runResults = results
     .filter((r) => r.unit === 'run')
     .sort((a, b) => a.actualDate.localeCompare(b.actualDate));
-  const bests = personalBests(map).slice(0, 6);
+  const bests = personalBests(map);
   const reschedule = () => {
     if (!moveDate || moveDate < today || moveDate > program.end) {
       notify('Choose a date from today through the end of the program.');
@@ -1706,7 +1706,7 @@ export default function TrainingApp({ user }: { user: User }) {
                     <p className="empty-line">No recorded results yet.</p>
                   )}
                 </section>
-                <section className="pb-card">
+                <section className="pb-card progress-bests">
                   <div className="section-heading">
                     <div>
                       <span className="eyebrow">YOUR OWN BENCHMARKS</span>
@@ -1714,7 +1714,9 @@ export default function TrainingApp({ user }: { user: User }) {
                     </div>
                     <Target size={20} />
                   </div>
-                  <PersonalBestRows bests={bests} />
+                  <div className="pb-list">
+                    <PersonalBestRows bests={bests} />
+                  </div>
                 </section>
               </div>
               <section className="run-history">
@@ -2356,7 +2358,7 @@ function ExerciseLogger({
         <div className="optional-result-panel">
           <div className="optional-result-heading">
             <strong>Your actual results</strong>
-            <span>Only these numbers feed performance charts.</span>
+            <span>A ticked set records its target. Enter what you did if it differs.</span>
           </div>
           {prior && (
             <div className="last-result">

@@ -1518,6 +1518,18 @@ main {
   text-align: center;
   color: var(--faint);
 }
+/* Beside the chart, the chart sets the card's height and the list scrolls within it. */
+.progress-bests {
+  contain: size;
+  display: flex;
+  flex-direction: column;
+}
+.pb-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
 .trend-select {
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -2077,6 +2089,12 @@ main {
   }
   .progress-grid {
     grid-template-columns: 1fr;
+  }
+  .progress-bests {
+    contain: none;
+  }
+  .pb-list {
+    mask-image: none;
   }
   .chart-card {
     min-height: 320px;
