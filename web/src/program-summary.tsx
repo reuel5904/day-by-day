@@ -1,5 +1,5 @@
-import { ArrowRight, Dumbbell, Flag, Flame, Target } from 'lucide-react';
-import { dateLabel, type Event, type Program } from './training-model';
+import { ArrowRight, Dumbbell, Flag, Flame, Target, Timer } from 'lucide-react';
+import { dateLabel, formatDuration, type Event, type Program } from './training-model';
 import { programSummary } from './progress-model';
 
 const amount = (result: { value: number; right?: number }) =>
@@ -70,6 +70,15 @@ export default function ProgramSummary({
           </div>
           <strong>{summary.bestStreak}</strong>
         </section>
+        {summary.averageDuration !== null && (
+          <section className="stat-card">
+            <div className="stat-top">
+              <span>Average workout</span>
+              <Timer size={20} />
+            </div>
+            <strong>{formatDuration(summary.averageDuration)}</strong>
+          </section>
+        )}
       </div>
       <div className="progress-grid">
         {summary.tests.length > 0 && (

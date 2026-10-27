@@ -328,6 +328,64 @@ export function workoutStatus(
 }
 export const isFinished = (status: WorkoutStatus) =>
   status.id === 'complete' || status.id === 'legacy';
+
+// The workout clock: seconds banked by earlier stretches, plus the stretch running since `since`.
+export type Clock = { elapsed: number; since: string | null };
+export const CLOCK_IDLE_LIMIT = 3 * 60 * 60 * 1000;
+export const clockKey = (date: string) => `clock:${date}`;
+// Concurrent edits keep both versions for review, but the clock reads the newest meanwhile.
+export const clockOf = (map: Record<string, Event[]>, date: string): Clock | undefined =>
+  map[clockKey(date)]?.at(-1)?.data ?? undefined;
+export const clockSeconds = (clock: Clock | undefined, now: number) =>
+  !clock
+    ? 0
+    : clock.elapsed + (clock.since ? Math.max(0, (now - Date.parse(clock.since)) / 1000) : 0);
+export const startClock = (clock: Clock | undefined, now: number): Clock => ({
+  elapsed: clock?.elapsed ?? 0,
+  since: new Date(now).toISOString(),
+});
+export const pauseClock = (clock: Clock, at: number): Clock => ({
+  elapsed: Math.min(86400, Math.round(clockSeconds(clock, at))),
+  since: null,
+});
+// When anything in a workout was last ticked, unticked or recorded.
+export function lastLoggedAt(map: Record<string, Event[]>, date: string): number | null {
+  const times = Object.entries(map)
+    .filter(([key]) => key.startsWith(`set:${date}:`) || key.startsWith(`completion:${date}:`))
+    .flatMap(([, versions]) => versions.map((v) => Date.parse(v.at)));
+  return times.length ? Math.max(...times) : null;
+}
+// Running clocks that should stop: at the tick that completed their workout, or at the last
+// thing logged once nothing has been logged for CLOCK_IDLE_LIMIT.
+export function clockStops(map: Record<string, Event[]>, now: number) {
+  return Object.keys(map)
+    .filter((key) => key.startsWith('clock:'))
+    .flatMap((entity) => {
+      const date = entity.slice('clock:'.length);
+      const clock = clockOf(map, date);
+      const day = days.find((d) => d.date === date);
+      if (!clock?.since || !day) return [];
+      const since = Date.parse(clock.since);
+      const logged = lastLoggedAt(map, date);
+      if (logged !== null && logged > since && completedOn(day, map))
+        return [{ entity, data: pauseClock(clock, logged), idle: false }];
+      const active = Math.max(since, logged ?? since);
+      return now - active > CLOCK_IDLE_LIMIT
+        ? [{ entity, data: pauseClock(clock, active), idle: true }]
+        : [];
+    });
+}
+// A finished workout's recorded duration in seconds, or null when it was not timed.
+export function workoutDuration(day: Day, map: Record<string, Event[]>): number | null {
+  const clock = clockOf(map, day.date);
+  return clock && !clock.since && clock.elapsed > 0 ? clock.elapsed : null;
+}
+export const formatClock = (s: number) =>
+  s >= 3600 ? `${Math.floor(s / 3600)}:${formatTime(s % 3600)}` : formatTime(s);
+export const formatDuration = (s: number) => {
+  const minutes = Math.round(s / 60);
+  return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
+};
 export function onTime(d: Day, map: Record<string, Event[]>) {
   const completed = completedOn(d, map);
   return completed !== null && completed <= deadline(d, map);
@@ -411,6 +469,13 @@ export function validEventData(entity: string, data: any): boolean {
   if (entity.startsWith('config:'))
     return Number.isInteger(data.count) && data.count >= 1 && data.count <= 20;
   if (entity.startsWith('stage:')) return str(data.variation) && data.variation.length > 0;
+  if (entity.startsWith('clock:'))
+    return (
+      Number.isFinite(data.elapsed) &&
+      data.elapsed >= 0 &&
+      data.elapsed <= 86400 &&
+      (data.since === null || (str(data.since, 64) && Number.isFinite(Date.parse(data.since))))
+    );
   return false;
 }
 export function validateEvents(value: unknown): value is Event[] {
@@ -424,7 +489,7 @@ export function validateEvents(value: unknown): value is Event[] {
         /^[\w-]{1,100}$/.test(e.id) &&
         typeof e.entity === 'string' &&
         e.entity.length < 250 &&
-        /^(set|completion|session|config|stage|notes|schedule|legacy):/.test(e.entity) &&
+        /^(set|completion|session|config|stage|notes|schedule|legacy|clock):/.test(e.entity) &&
         validEventData(e.entity, e.data) &&
         Array.isArray(e.parents) &&
         e.parents.length <= 100 &&

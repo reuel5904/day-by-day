@@ -73,6 +73,14 @@ _Avoid_: Finished workout
 A started workout that was finished early, or not completed by its scheduled date.
 _Avoid_: Partial session, completed workout
 
+**Workout clock**:
+A stopwatch for a whole workout. Ticking the first set while training starts it, or you start it yourself; it can be paused and resumed, and it stops when the workout is completed or finished early, or after three hours with nothing logged.
+_Avoid_: Session timer, rest timer
+
+**Workout duration**:
+The time a stopped workout clock shows, as recorded or as corrected by hand. A workout without one was not timed.
+_Avoid_: Session length, run time
+
 **Imported completion**:
 A workout marked complete in the original version of the app. It counts as a completed workout but has no actual training date or set results.
 _Avoid_: Legacy completion

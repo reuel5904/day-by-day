@@ -2,7 +2,7 @@
 
 A personal calisthenics and running planner, published at **https://reuel5904.github.io/day-by-day/**.
 
-Follow a dated training program (the current one runs October 13, 2026–January 10, 2027), tick off sets as you go, rest with an audible timer, and track consistency and measured performance.
+Follow a dated training program (the current one runs October 13, 2026–January 10, 2027), tick off sets as you go, time each workout, rest with an audible timer, and track consistency and measured performance.
 
 ## GitHub Pages version
 
@@ -65,4 +65,4 @@ npm run build
 
 The build writes the site to `dist/`, which is not committed. Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): it runs the checks above, builds, and deploys `dist/` to GitHub Pages, and nothing deploys if a check fails. The Pages source is set to **GitHub Actions**. The `/day-by-day/` asset base and service worker scope are configured for this project site.
 
-The tests cover program data integrity, set completion, the program summary, URLs, conflict preservation, streak rules, imported-history validation, account isolation, retry behavior, concurrent edits, malformed responses, and paginated downloads. `supabase/tests/training_history.sql` verifies real database role access inside a rolled-back transaction, including anonymous denial, cross-account isolation, and immutable retry semantics. See `GLOSSARY.md`, `docs/design.md`, and `docs/adr/` for product behavior and decisions.
+The tests cover program data integrity, set completion, the workout clock, the program summary, URLs, conflict preservation, streak rules, imported-history validation, account isolation, retry behavior, concurrent edits, malformed responses, and paginated downloads. `supabase/tests/training_history.sql` verifies real database role access inside a rolled-back transaction, including anonymous denial, cross-account isolation, and immutable retry semantics. See `GLOSSARY.md`, `docs/design.md`, and `docs/adr/` for product behavior and decisions.

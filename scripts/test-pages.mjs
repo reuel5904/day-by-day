@@ -30,6 +30,14 @@ const {
   finishedProgramAt,
   screenFromHash,
   hashForScreen,
+  clockOf,
+  clockSeconds,
+  clockStops,
+  startClock,
+  pauseClock,
+  workoutDuration,
+  formatClock,
+  formatDuration,
 } = await import('../.work/pages-test/training-model.mjs');
 const { EXERCISES } = await import('../.work/pages-test/exercises.mjs');
 let count = 0;
@@ -475,5 +483,106 @@ test('A history with imported completions still validates', () => {
     }),
   ];
   assert.equal(validateEvents(events), true);
+});
+const at = (time) => `2026-10-19T${time}:00.000Z`;
+const loggedAt = (date, sets, time) =>
+  sets.map((set) => ({
+    ...event(`tick-${date}-${set}-${time}`, `completion:${date}:${set}`, {
+      completed: true,
+      day: date,
+      actualDate: date,
+    }),
+    at: at(time),
+  }));
+const clockEvent = (date, data, time = '10:00') => ({
+  ...event(`clock-${date}-${time.replace(':', '')}`, `clock:${date}`, data),
+  at: at(time),
+});
+test('The workout clock adds the running stretch to the time banked before it', () => {
+  const started = startClock(undefined, Date.parse(at('10:00')));
+  assert.deepEqual(started, { elapsed: 0, since: at('10:00') });
+  assert.equal(clockSeconds(started, Date.parse(at('10:30'))), 1800);
+  const paused = pauseClock(started, Date.parse(at('10:30')));
+  assert.deepEqual(paused, { elapsed: 1800, since: null });
+  assert.equal(clockSeconds(paused, Date.parse(at('12:00'))), 1800);
+  const resumed = startClock(paused, Date.parse(at('11:00')));
+  assert.equal(clockSeconds(resumed, Date.parse(at('11:15'))), 2700);
+  assert.equal(clockSeconds(undefined, Date.now()), 0);
+});
+test('The workout clock stops at the tick that completes the workout', () => {
+  const sets = requiredSets('2026-10-19');
+  const map = heads([
+    clockEvent('2026-10-19', { elapsed: 0, since: at('10:00') }),
+    ...loggedAt('2026-10-19', sets.slice(0, -1), '10:20'),
+    ...loggedAt('2026-10-19', sets.slice(-1), '10:48'),
+  ]);
+  assert.deepEqual(clockStops(map, Date.parse(at('11:00'))), [
+    { entity: 'clock:2026-10-19', data: { elapsed: 2880, since: null }, idle: false },
+  ]);
+  assert.equal(
+    workoutDuration(
+      days.find((d) => d.date === '2026-10-19'),
+      map,
+    ),
+    null,
+  );
+});
+test('A clock resumed after the workout is complete keeps running, e.g. for a cool-down', () => {
+  const map = heads([
+    ...loggedAt('2026-10-19', requiredSets('2026-10-19'), '10:48'),
+    clockEvent('2026-10-19', { elapsed: 2880, since: at('10:50') }, '10:50'),
+  ]);
+  assert.deepEqual(clockStops(map, Date.parse(at('11:00'))), []);
+});
+test('An incomplete workout keeps its clock running until nothing is logged for 3 hours', () => {
+  const sets = requiredSets('2026-10-19');
+  const map = heads([
+    clockEvent('2026-10-19', { elapsed: 0, since: at('10:00') }),
+    ...loggedAt('2026-10-19', sets.slice(0, 2), '10:30'),
+  ]);
+  assert.deepEqual(clockStops(map, Date.parse(at('13:29'))), []);
+  assert.deepEqual(clockStops(map, Date.parse(at('13:31'))), [
+    { entity: 'clock:2026-10-19', data: { elapsed: 1800, since: null }, idle: true },
+  ]);
+  const untouched = heads([clockEvent('2026-10-19', { elapsed: 600, since: at('10:00') })]);
+  assert.deepEqual(clockStops(untouched, Date.parse(at('13:01'))), [
+    { entity: 'clock:2026-10-19', data: { elapsed: 600, since: null }, idle: true },
+  ]);
+});
+test('A workout duration counts only a stopped clock with time on it', () => {
+  const day = days.find((d) => d.date === '2026-10-19');
+  const of = (data) => workoutDuration(day, heads([clockEvent(day.date, data)]));
+  assert.equal(of({ elapsed: 2880, since: null }), 2880);
+  assert.equal(of({ elapsed: 0, since: null }), null);
+  assert.equal(of({ elapsed: 600, since: at('10:00') }), null);
+  assert.equal(workoutDuration(day, {}), null);
+});
+test('Conflicting clock edits stay for review while the clock reads the newest', () => {
+  const map = heads([
+    clockEvent('2026-10-19', { elapsed: 600, since: null }, '10:10'),
+    clockEvent('2026-10-19', { elapsed: 900, since: null }, '10:15'),
+  ]);
+  assert.equal(map['clock:2026-10-19'].length, 2);
+  assert.deepEqual(clockOf(map, '2026-10-19'), { elapsed: 900, since: null });
+});
+test('Clock records validate, and malformed ones are rejected', () => {
+  assert.equal(
+    validateEvents([clockEvent('2026-10-19', { elapsed: 0, since: at('10:00') })]),
+    true,
+  );
+  assert.equal(validateEvents([clockEvent('2026-10-19', { elapsed: 2880, since: null })]), true);
+  for (const data of [
+    { elapsed: -1, since: null },
+    { elapsed: 90000, since: null },
+    { elapsed: 10, since: 'later' },
+    { elapsed: 10 },
+  ])
+    assert.equal(validateEvents([clockEvent('2026-10-19', data)]), false);
+});
+test('Workout times read as a clock while running and in minutes once recorded', () => {
+  assert.equal(formatClock(754), '12:34');
+  assert.equal(formatClock(3725), '1:02:05');
+  assert.equal(formatDuration(2880), '48 min');
+  assert.equal(formatDuration(4380), '1 h 13 min');
 });
 console.log(`\n${count} domain and data-integrity checks passed.`);

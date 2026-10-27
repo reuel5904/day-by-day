@@ -21,12 +21,14 @@ import {
   Leaf,
   LoaderCircle,
   Pause,
+  Pencil,
   Play,
   Plus,
   RotateCcw,
   Settings2,
   ShieldCheck,
   Sparkles,
+  Square,
   Target,
   Timer,
   TrendingUp,
@@ -37,6 +39,11 @@ import {
 } from 'lucide-react';
 import {
   addDays,
+  clockKey,
+  clockOf,
+  clockSeconds,
+  clockStops,
+  type Clock,
   completionChanges,
   completionKey,
   currentVariation,
@@ -49,6 +56,8 @@ import {
   effectiveDate,
   Event,
   Exercise,
+  formatClock,
+  formatDuration,
   formatTime,
   heads,
   isRunDay,
@@ -57,16 +66,19 @@ import {
   mergeEvents,
   mondayOf,
   moveWorkout,
+  pauseClock,
   programAt,
   programDays,
   prescriptionLine,
   resultEntries,
   Section,
   setKey,
+  startClock,
   streaks,
   topOf,
   untickChanges,
   validateEvents,
+  workoutDuration,
   workoutSets,
   workoutStatus,
   finishedProgramAt,
@@ -143,6 +155,10 @@ function TimerRing({ timer }: { timer: TimerState }) {
     </div>
   );
 }
+function ClockReading({ clock }: { clock: Clock | undefined }) {
+  useTicker(Boolean(clock?.since));
+  return <>{formatClock(Math.floor(clockSeconds(clock, Date.now())))}</>;
+}
 const unitLabel = (u: string) => (u === 'sec' ? 'seconds' : u === 'run' ? 'miles' : 'reps');
 const sameResult = (a: any, b: any) =>
   a.name === b.name &&
@@ -181,10 +197,13 @@ export default function TrainingApp({ user }: { user: User }) {
     [],
   );
   const [settings, setSettings] = useState(false);
-  const [modal, setModal] = useState<'finish' | 'move' | 'timer' | null>(null);
+  const [modal, setModal] = useState<'finish' | 'move' | 'timer' | 'clock' | null>(null);
   const [customMinutes, setCustomMinutes] = useState('1');
   const [customSeconds, setCustomSeconds] = useState('30');
   const [customTimerError, setCustomTimerError] = useState('');
+  const [clockHours, setClockHours] = useState('0');
+  const [clockMinutes, setClockMinutes] = useState('0');
+  const [clockError, setClockError] = useState('');
   const [actualDate, setActualDate] = useState('');
   const [loggingDate, setLoggingDate] = useState(() => localDate());
   const [moveDate, setMoveDate] = useState('');
@@ -543,6 +562,21 @@ export default function TrainingApp({ user }: { user: User }) {
       document.removeEventListener('visibilitychange', request);
     };
   }, [keepAwake]);
+  useEffect(() => {
+    if (!loaded) return;
+    const check = () => {
+      const stops = clockStops(heads(storeRef.current.events), Date.now());
+      if (!stops.length) return;
+      writeMany(stops.map(({ entity, data }) => ({ entity, data })));
+      if (stops.some((stop) => stop.idle))
+        notify(
+          'Workout clock paused at your last logged set after 3 quiet hours. Edit the time if it’s off.',
+        );
+    };
+    check();
+    const interval = setInterval(check, 60000);
+    return () => clearInterval(interval);
+  }, [map, loaded, writeMany, notify]);
   const startRest = (duration: number, label: string) => {
     if (!duration) return;
     unlockAudio();
@@ -634,6 +668,45 @@ export default function TrainingApp({ user }: { user: User }) {
     .map((set) => set.key);
   const requiredDone = requiredKeys.filter((k) => isSetComplete(map, k)).length;
   const percent = requiredKeys.length ? Math.round((requiredDone / requiredKeys.length) * 100) : 0;
+  const clock = clockOf(map, day.date);
+  const clockDone = isFinished(status) || status.id === 'partial';
+  // The first set ticked while training today starts the clock; back-filled workouts stay untimed.
+  const clockStart = () =>
+    !clock && loggingDate === today && !isFinished(status)
+      ? [{ entity: clockKey(day.date), data: startClock(undefined, Date.now()) }]
+      : [];
+  const toggleClock = () =>
+    write(
+      clockKey(day.date),
+      clock?.since ? pauseClock(clock, Date.now()) : startClock(clock, Date.now()),
+    );
+  const openClockEdit = () => {
+    const seconds = Math.round(clockSeconds(clock, Date.now()));
+    setClockHours(String(Math.floor(seconds / 3600)));
+    setClockMinutes(String(Math.floor((seconds % 3600) / 60)));
+    setClockError('');
+    setModal('clock');
+  };
+  const saveClock = () => {
+    const hours = Number(clockHours),
+      minutes = Number(clockMinutes);
+    if (
+      !Number.isInteger(hours) ||
+      !Number.isInteger(minutes) ||
+      hours < 0 ||
+      hours > 23 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      setClockError('Enter whole hours from 0 to 23 and minutes from 0 to 59.');
+      return;
+    }
+    write(clockKey(day.date), {
+      elapsed: hours * 3600 + minutes * 60,
+      since: clock?.since ? new Date().toISOString() : null,
+    });
+    setModal(null);
+  };
   const weekStart = mondayOf(selected);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const planned = days.filter(
@@ -730,7 +803,10 @@ export default function TrainingApp({ user }: { user: User }) {
     writeMany(
       done
         ? untickChanges(map, k, selected, loggingDate)
-        : completionChanges(map, [{ key: k, exercise: e }], selected, loggingDate),
+        : [
+            ...completionChanges(map, [{ key: k, exercise: e }], selected, loggingDate),
+            ...clockStart(),
+          ],
     );
     setBulkUndo([]);
     if (!done) afterSingleCompletion(e, i, section, false);
@@ -795,6 +871,7 @@ export default function TrainingApp({ user }: { user: User }) {
         entity: completionKey(k),
         data: { completed: true, day: selected, actualDate: loggingDate },
       },
+      ...(wasComplete ? [] : clockStart()),
     ]);
     afterSingleCompletion(e, i, section, wasComplete);
   };
@@ -821,6 +898,8 @@ export default function TrainingApp({ user }: { user: User }) {
       entity: `session:${selected}`,
       data: { status: 'partial', actualDate, finishedAt: new Date().toISOString() },
     });
+    if (clock?.since)
+      values.push({ entity: clockKey(day.date), data: pauseClock(clock, Date.now()) });
     writeMany(values);
     setBulkUndo([]);
     stopAlarm();
@@ -1227,6 +1306,60 @@ export default function TrainingApp({ user }: { user: User }) {
                         onChange={(e) => setLoggingDate(e.target.value)}
                       />
                     </label>
+                  )}
+                  {day.sections.length > 0 && status.id !== 'legacy' && (
+                    <section
+                      className={`workout-clock ${clock?.since ? 'running' : ''}`}
+                      aria-label="Workout clock"
+                    >
+                      <Timer size={18} />
+                      <div className="workout-clock-copy">
+                        <span className="eyebrow">WORKOUT TIME</span>
+                        <div>
+                          <strong>
+                            <ClockReading clock={clock} />
+                          </strong>
+                          <span>
+                            {clock?.since
+                              ? 'Running'
+                              : clock
+                                ? clockDone
+                                  ? 'Finished'
+                                  : 'Paused'
+                                : clockDone
+                                  ? 'Not timed'
+                                  : 'Starts with your first set'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        className="icon-button"
+                        aria-label="Edit workout time"
+                        onClick={openClockEdit}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      {(clock || !clockDone) && (
+                        <button className="secondary workout-clock-toggle" onClick={toggleClock}>
+                          {clock?.since ? (
+                            clockDone ? (
+                              <Square size={15} />
+                            ) : (
+                              <Pause size={16} />
+                            )
+                          ) : (
+                            <Play size={16} />
+                          )}
+                          {clock?.since
+                            ? clockDone
+                              ? 'Stop'
+                              : 'Pause'
+                            : clock
+                              ? 'Resume'
+                              : 'Start'}
+                        </button>
+                      )}
+                    </section>
                   )}
                   {day.sections.length > 0 && (
                     <section id="exercise-list" className="exercise-section">
@@ -1758,6 +1891,8 @@ export default function TrainingApp({ user }: { user: User }) {
                       {status.actualDate
                         ? dateLabel(status.actualDate)
                         : 'Training date not recorded'}
+                      {workoutDuration(d, map) !== null &&
+                        ` · ${formatDuration(workoutDuration(d, map)!)}`}
                     </span>
                     <b>{status.label}</b>
                     <ArrowUpRight size={16} />
@@ -1898,7 +2033,9 @@ export default function TrainingApp({ user }: { user: User }) {
                   ? 'Finish early'
                   : modal === 'timer'
                     ? 'Custom timer'
-                    : 'Reschedule workout'
+                    : modal === 'clock'
+                      ? 'Edit workout time'
+                      : 'Reschedule workout'
             }
             onClick={(e) => e.stopPropagation()}
           >
@@ -2065,6 +2202,60 @@ export default function TrainingApp({ user }: { user: User }) {
                   <button className="primary modal-primary" type="submit">
                     <Timer size={18} />
                     Set timer
+                  </button>
+                </form>
+              </>
+            ) : modal === 'clock' ? (
+              <>
+                <span className="eyebrow">WORKOUT TIME</span>
+                <h2>Set the time.</h2>
+                <p className="modal-description">
+                  Forgot to start or pause the clock? Enter how long this workout took.
+                  {clock?.since ? ' The clock keeps running from the new time.' : ''}
+                </p>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    saveClock();
+                  }}
+                >
+                  <div className="custom-time-fields">
+                    <label className="field-label">
+                      Hours
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        max="23"
+                        step="1"
+                        value={clockHours}
+                        onChange={(e) => setClockHours(e.target.value)}
+                        aria-describedby={clockError ? 'clock-time-error' : undefined}
+                      />
+                    </label>
+                    <span aria-hidden="true">:</span>
+                    <label className="field-label">
+                      Minutes
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        max="59"
+                        step="1"
+                        value={clockMinutes}
+                        onChange={(e) => setClockMinutes(e.target.value)}
+                        aria-describedby={clockError ? 'clock-time-error' : undefined}
+                      />
+                    </label>
+                  </div>
+                  {clockError && (
+                    <p className="custom-time-error" role="alert" id="clock-time-error">
+                      {clockError}
+                    </p>
+                  )}
+                  <button className="primary modal-primary" type="submit">
+                    <Timer size={18} />
+                    Save time
                   </button>
                 </form>
               </>

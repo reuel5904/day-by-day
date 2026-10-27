@@ -5040,7 +5040,7 @@ main {
 
 /* Program summary */
 .summary-stats {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   margin-top: 18px;
 }
 .summary-actions {
@@ -5048,4 +5048,63 @@ main {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 18px;
+}
+
+/* Workout clock: the whole workout's elapsed time, above the sets. */
+.workout-clock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.workout-clock.running {
+  border-color: var(--primary-line);
+}
+.workout-clock.running > svg {
+  color: var(--green-text);
+}
+.workout-clock-copy {
+  flex: 1;
+  min-width: 0;
+}
+.workout-clock-copy .eyebrow {
+  font-size: 10px;
+}
+.workout-clock-copy div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  font-size: 13px;
+}
+.workout-clock-copy strong {
+  font-size: 20px;
+  font-weight: 650;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.workout-clock .icon-button {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+}
+.workout-clock-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .workout-clock-copy div {
+    font-size: 12px;
+  }
+  .workout-clock-toggle {
+    padding: 8px 12px;
+  }
 }

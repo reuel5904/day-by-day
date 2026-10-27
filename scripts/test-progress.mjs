@@ -213,6 +213,17 @@ test('The program summary counts completed workouts against planned ones and the
   assert.equal(summary.completed, 4);
   assert.equal(summary.planned, 77);
   assert.equal(summary.bestStreak, 3);
+  assert.equal(summary.averageDuration, null);
+});
+test('The program summary averages the recorded times of finished workouts', () => {
+  const clock = (date, data) => event(`clock-${date}`, `clock:${date}`, data);
+  const map = heads([
+    ...['2026-10-19', '2026-10-20', '2026-10-21'].flatMap((d) => tickAll(d)),
+    clock('2026-10-19', { elapsed: 2400, since: null }),
+    clock('2026-10-20', { elapsed: 3600, since: null }),
+    clock('2026-10-22', { elapsed: 600, since: null }),
+  ]);
+  assert.equal(programSummary(map, programs[0], '2027-01-11').averageDuration, 3000);
 });
 test('Personal bests compare results only within the same exercise variation', () => {
   const map = heads([

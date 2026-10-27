@@ -14,6 +14,7 @@ import {
   setCount,
   setKey,
   streaks,
+  workoutDuration,
   workoutSets,
   workoutStatus,
   type Day,
@@ -192,8 +193,15 @@ export function personalBests(map: History, program?: Program) {
 
 export function programSummary(map: History, program: Program, today: string) {
   const training = programDays(program).filter((day) => day.sections.length);
+  const durations = training
+    .filter((day) => isFinished(workoutStatus(day, map, today)))
+    .map((day) => workoutDuration(day, map))
+    .filter((s) => s !== null);
   return {
     completed: training.filter((day) => isFinished(workoutStatus(day, map, today))).length,
+    averageDuration: durations.length
+      ? durations.reduce((sum, s) => sum + s, 0) / durations.length
+      : null,
     planned: training.length,
     bestStreak: streaks(map, today, program).best,
     personalBests: personalBests(map, program),
