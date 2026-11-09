@@ -316,7 +316,7 @@ Pull-ups at 5×5 clean on all three days? Switch to 4×6-8 next week. Tuesday st
 
 **Sun Nov 22 · Rest**
 
-## W4 · Nov 23-29 · Full volume, hollow Tier 2, Thanksgiving
+## W4 · Nov 23-29 · Full volume, hollow Tier 2
 
 Bulgarians at 3×15/leg clean? Move to Tempo Bulgarian (3s down, 1s pause).
 
@@ -343,7 +343,7 @@ Bulgarians at 3×15/leg clean? Move to Tempo Bulgarian (3s down, 1s pause).
 - C. Negative Pull-Ups: 3×3 @ 7s · rest 2 min
 - D. Superset ×3: Diamond chain 8-15 \[Diamond\] → Glute Bridge chain \[Single-Leg\] · rest 90s
 
-**Thu Nov 26 · Run + Core (Thanksgiving)**
+**Thu Nov 26 · Run + Core**
 
 - Warm-up: Pelvic Tilts 2×10, Cat-Cow 1×10
 - Run: **2.5 mi** easy (or a local turkey trot at a jog)
@@ -516,7 +516,7 @@ Floor pike at 3×12 clean? Feet go on the chair. Hardest week before the deload.
 
 **Sun Dec 20 · Rest**
 
-## W8 · Dec 21-27 · Deload (Christmas week)
+## W8 · Dec 21-27 · Deload
 
 2 sets on every exercise and stay on the same variation as W7. Pull-ups and chin-ups: stop 2 reps shy of your best. Everything else: stop 2 reps shy of the top of its range. No strides.
 
@@ -550,7 +550,7 @@ Floor pike at 3×12 clean? Feet go on the chair. Hardest week before the deload.
 - Hollow Hold (low straight-leg): 2×15s · L-Sit: 2×10s · Side Plank: 2×45s/side · Dead Bug: 2×12/side slow · Single-Leg Calf Raises: 2×15/leg
 - Cool-down: Hip Flexor Stretch 2×30s/side
 
-**Fri Dec 25 · Strength (deload, Christmas)**
+**Fri Dec 25 · Strength (deload)**
 
 - Warm-up: arm circles, 15 bodyweight squats, scapular pull-ups 2×8
 - A. Pull-Ups: 2 sets, 2 shy of your best · rest 2 min
@@ -600,7 +600,7 @@ Back to 3 sets after the deload. Don't add anything. Saturday is your 4-mile run
 - Hollow Hold (low straight-leg): 3×20s · L-Sit (full): 3×12s · Side Plank (raised foot): 2×45s/side · Dead Bug: 3×12/side slow · Single-Leg Calf Raises: 3×20/leg
 - Cool-down: Hip Flexor Stretch 2×30s/side
 
-**Fri Jan 1 · Strength (New Year's Day)**
+**Fri Jan 1 · Strength**
 
 - Warm-up: arm circles, 15 bodyweight squats, scapular pull-ups 2×8
 - A. Pull-Ups: 5×2-5 or 4×6-8 · rest 2 min

@@ -1,7 +1,7 @@
 import {
   addDays,
+  calendar,
   completionKey,
-  days,
   effectiveDate,
   isFinished,
   isRunDay,
@@ -31,7 +31,7 @@ export function completedKeys(day: Day, map: History) {
 }
 
 export function calendarDay(date: string, map: History, today: string) {
-  const scheduled = days.filter((day) => effectiveDate(day, map) === date);
+  const scheduled = calendar(map).filter((day) => effectiveDate(day, map) === date);
   const workouts = scheduled.filter((day) => day.sections.length);
   const statuses = (workouts.length ? workouts : scheduled).map((day) =>
     workoutStatus(day, map, today),
@@ -56,8 +56,12 @@ export function calendarDay(date: string, map: History, today: string) {
   return { status, target, workoutCount: workouts.length };
 }
 
-export function progressSummary(map: History, today: string, program: Program = programAt(today)) {
-  const own = programDays(program);
+export function progressSummary(
+  map: History,
+  today: string,
+  program: Program = programAt(today, map),
+) {
+  const own = programDays(program, map);
   const training = own.filter((day) => day.sections.length);
   const statuses = new Map(training.map((day) => [day.date, workoutStatus(day, map, today)]));
   const statusOf = (day: Day) => statuses.get(day.date)!;
@@ -126,7 +130,7 @@ const score = (result: { value: number; right?: number; sides?: boolean }) =>
 // Each tested exercise's best result in the last week that tests it, and the best from the
 // first week that did, when that was earlier: the final dead hang against Oct 16.
 function testResults(map: History, program: Program) {
-  const sets = programDays(program).flatMap((day) =>
+  const sets = programDays(program, map).flatMap((day) =>
     day.sections.flatMap((section) =>
       section.exercises
         .filter((exercise) => exercise.test)
@@ -171,7 +175,7 @@ function testResults(map: History, program: Program) {
 // The best result for each exercise, variation, assistance and tempo, so a higher count at an
 // easier variation never counts as a best for a harder one. Runs are left out.
 export function personalBests(map: History, program?: Program) {
-  const own = program && new Set(programDays(program).map((day) => day.date));
+  const own = program && new Set(programDays(program, map).map((day) => day.date));
   const best: Record<string, any> = {};
   for (const result of resultEntries(map)) {
     if (result.unit === 'run' || (own && !own.has(result.day))) continue;
@@ -192,7 +196,7 @@ export function personalBests(map: History, program?: Program) {
 }
 
 export function programSummary(map: History, program: Program, today: string) {
-  const training = programDays(program).filter((day) => day.sections.length);
+  const training = programDays(program, map).filter((day) => day.sections.length);
   const durations = training
     .filter((day) => isFinished(workoutStatus(day, map, today)))
     .map((day) => workoutDuration(day, map))

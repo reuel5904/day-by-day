@@ -58,6 +58,8 @@ export type Day = {
   date: string;
   title: string;
   program: string;
+  // The week as the program writes it; code tells its runs apart, such as "W1 (repeat)".
+  week: string;
   code: string;
   phase: string;
   note: string;
@@ -107,12 +109,13 @@ const toSection = ({ rest, exercises, ...section }: SectionData): Section => ({
   rest: rest ?? 0,
   exercises: exercises.map(toExercise),
 });
-export const days: Day[] = programData.flatMap((p) =>
+const writtenDays: Day[] = programData.flatMap((p) =>
   p.weeks.flatMap((w) =>
     w.days.map((d) => ({
       date: d.date,
       title: d.title,
       program: p.id,
+      week: w.code,
       code: w.code,
       phase: w.title,
       note: w.note,
@@ -120,21 +123,91 @@ export const days: Day[] = programData.flatMap((p) =>
     })),
   ),
 );
-export const programs: Program[] = programData.map(({ weeks, ...p }) => {
-  const own = days.filter((d) => d.program === p.id);
-  return { ...p, start: own[0].date, end: own.at(-1)!.date, weeks: weeks.map((w) => w.code) };
-});
+const daysBetween = (from: string, to: string) =>
+  Math.round((Date.parse(to + 'T12:00:00') - Date.parse(from + 'T12:00:00')) / 86400000);
+// A repeated week (ADR-0009): from `start` on, the program runs again from `week`.
+export type Repeat = { program: string; week: string; start: string };
+export const repeatKey = (start: string) => `repeat:${start}`;
+// Concurrent edits stay conflicts for review, but the newest version applies meanwhile.
+const repeatsIn = (map: Record<string, Event[]>): Repeat[] =>
+  Object.keys(map)
+    .filter((key) => key.startsWith('repeat:'))
+    .map((key) => map[key].at(-1)!.data as Repeat | null)
+    .filter((repeat) => repeat !== null)
+    .sort((a, b) => a.start.localeCompare(b.start));
+function runProgram(written: Day[], repeats: Repeat[]): Day[] {
+  const runs = [
+    { first: written[0].date, start: written[0].date },
+    ...repeats.flatMap(({ week, start }) => {
+      const first = written.find((d) => d.week === week)?.date;
+      return first ? [{ first, start }] : [];
+    }),
+  ];
+  const timesRun = new Map<string, number>();
+  return runs.flatMap(({ first, start }, i) => {
+    const until = runs[i + 1]?.start;
+    const offset = daysBetween(first, start);
+    const running = written
+      .filter((d) => d.date >= first)
+      .map((d) => ({ ...d, date: addDays(d.date, offset) }))
+      .filter((d) => !until || d.date < until);
+    const runCodes = new Map<string, string>();
+    for (const { week } of running) {
+      if (runCodes.has(week)) continue;
+      const times = (timesRun.get(week) ?? 0) + 1;
+      timesRun.set(week, times);
+      runCodes.set(
+        week,
+        times === 1 ? week : times === 2 ? `${week} (repeat)` : `${week} (repeat ${times - 1})`,
+      );
+    }
+    return running.map((d) => ({ ...d, code: runCodes.get(d.week)! }));
+  });
+}
+function buildSchedule(map: Record<string, Event[]>) {
+  const repeats = repeatsIn(map);
+  const days = programData.flatMap((p) =>
+    runProgram(
+      writtenDays.filter((d) => d.program === p.id),
+      repeats.filter((r) => r.program === p.id),
+    ),
+  );
+  const programs: Program[] = programData.map(({ weeks: _weeks, ...p }) => {
+    const own = days.filter((d) => d.program === p.id);
+    return {
+      ...p,
+      start: own[0].date,
+      end: own.at(-1)!.date,
+      weeks: [...new Set(own.map((d) => d.code))],
+    };
+  });
+  return { days, programs };
+}
+const schedules = new WeakMap<object, ReturnType<typeof buildSchedule>>();
+function scheduleOf(map: Record<string, Event[]>) {
+  let schedule = schedules.get(map);
+  if (!schedule) schedules.set(map, (schedule = buildSchedule(map)));
+  return schedule;
+}
+// Every day the programs now cover: as written, except where a repeated week has changed them.
+export const calendar = (map: Record<string, Event[]>) => scheduleOf(map).days;
+export const programsIn = (map: Record<string, Event[]>) => scheduleOf(map).programs;
 // The program running on a date; between programs, the last one that started; before any, the first.
-export const programAt = (date: string) =>
-  programs.find((p) => p.start <= date && date <= p.end) ??
-  programs.filter((p) => p.start <= date).at(-1) ??
-  programs[0];
+export function programAt(date: string, map: Record<string, Event[]>) {
+  const programs = programsIn(map);
+  return (
+    programs.find((p) => p.start <= date && date <= p.end) ??
+    programs.filter((p) => p.start <= date).at(-1) ??
+    programs[0]
+  );
+}
 // The program whose last day has passed, until the next one starts.
-export function finishedProgramAt(date: string) {
-  const program = programAt(date);
+export function finishedProgramAt(date: string, map: Record<string, Event[]>) {
+  const program = programAt(date, map);
   return program.end < date ? program : null;
 }
-export const programDays = (program: Program) => days.filter((d) => d.program === program.id);
+export const programDays = (program: Program, map: Record<string, Event[]>) =>
+  calendar(map).filter((d) => d.program === program.id);
 // The section's wording without the "A. Name:" lead-in that its heading already shows. A
 // variation in the lead-in stays: "Hollow Hold (tucked): 3×20s" becomes "tucked · 3×20s".
 export function prescriptionLine(section: Section) {
@@ -258,6 +331,78 @@ export function moveWorkout(d: Day, map: Record<string, Event[]>, today: string,
     ...(missedDeadline ? { missedDeadline } : {}),
   };
 }
+// Whether an event records something done, as opposed to a tick or a clock taken back.
+function recordsTraining(entity: string, data: any) {
+  if (data === null) return false;
+  if (entity.startsWith('completion:')) return data.completed === true;
+  if (entity.startsWith('set:')) return !data.skipped;
+  if (entity.startsWith('notes:')) return data.text !== '';
+  if (entity.startsWith('clock:')) return data.elapsed > 0 || data.since !== null;
+  return true;
+}
+// The last workout date with anything logged. Results are saved under that date, so it and
+// every earlier date must keep their workouts.
+export function lastLoggedDate(map: Record<string, Event[]>) {
+  const dates = Object.entries(map).flatMap(([entity, versions]) => {
+    const date = entity.match(
+      /^(?:set|completion|session|clock|notes|legacy):(\d{4}-\d{2}-\d{2})/,
+    )?.[1];
+    return date && versions.some((v) => recordsTraining(entity, v.data)) ? [date] : [];
+  });
+  return dates.sort().at(-1) ?? '';
+}
+const writtenStart = (program: string, week: string) =>
+  writtenDays.find((d) => d.program === program && d.week === week)!.date;
+// The earliest date a week can run again: on its weekday, so roadmap notes such as "Saturday is
+// your 4-mile run" stay true, from today on, and after everything logged.
+export function earliestRepeat(
+  map: Record<string, Event[]>,
+  { program, week }: Pick<Repeat, 'program' | 'week'>,
+  today: string,
+) {
+  const logged = lastLoggedDate(map);
+  const from = logged && logged >= today ? addDays(logged, 1) : today;
+  const wait = -daysBetween(writtenStart(program, week), from) % 7;
+  return addDays(from, wait < 0 ? wait + 7 : wait);
+}
+// The program as it would run with this repeat, or why it can't.
+export function previewRepeat(map: Record<string, Event[]>, repeat: Repeat, today: string) {
+  const earliest = earliestRepeat(map, repeat, today);
+  if (repeat.start < earliest)
+    return { problem: `Choose ${dateLabel(earliest)} or later: earlier dates are taken.` };
+  if (daysBetween(earliest, repeat.start) % 7)
+    return {
+      problem: `Choose a ${dateLabel(earliest, { weekday: 'long' })}, the day this week starts.`,
+    };
+  const event = {
+    id: 'preview',
+    entity: repeatKey(repeat.start),
+    parents: [],
+    data: repeat,
+    at: '',
+  };
+  const programs = programsIn({ ...map, [event.entity]: [event] });
+  const index = programs.findIndex((p) => p.id === repeat.program);
+  const next = programs[index + 1];
+  if (next && programs[index].end >= next.start)
+    return { problem: `That would run into ${next.title}, which starts ${dateLabel(next.start)}.` };
+  return { end: programs[index].end };
+}
+// Choosing a repeat also clears moves and set counts on the dates it takes over, since those
+// dates now hold different workouts.
+export function repeatChanges(map: Record<string, Event[]>, repeat: Repeat) {
+  const cleared = Object.keys(map).filter((entity) => {
+    const date = entity.match(/^(?:schedule|config):(\d{4}-\d{2}-\d{2})/)?.[1];
+    return date && date >= repeat.start && map[entity].some((v) => v.data !== null);
+  });
+  return [
+    { entity: repeatKey(repeat.start), data: repeat },
+    ...cleared.map((entity) => ({ entity, data: null })),
+  ];
+}
+// The repeated week starting on a date, if it can still be undone.
+export const canUndoRepeat = (map: Record<string, Event[]>, start: string) =>
+  repeatsIn(map).some((r) => r.start === start) && lastLoggedDate(map) < start;
 export const setCount = (day: Day, map: Record<string, Event[]>, e: Exercise) =>
   latest(map, `config:${day.date}:${e.id}`)?.count || e.count;
 export function workoutSets(day: Day, map: Record<string, Event[]>) {
@@ -363,7 +508,7 @@ export function clockStops(map: Record<string, Event[]>, now: number) {
     .flatMap((entity) => {
       const date = entity.slice('clock:'.length);
       const clock = clockOf(map, date);
-      const day = days.find((d) => d.date === date);
+      const day = calendar(map).find((d) => d.date === date);
       if (!clock?.since || !day) return [];
       const since = Date.parse(clock.since);
       const logged = lastLoggedAt(map, date);
@@ -391,7 +536,7 @@ export function onTime(d: Day, map: Record<string, Event[]>) {
   return completed !== null && completed <= deadline(d, map);
 }
 export function streaks(map: Record<string, Event[]>, today: string, program?: Program) {
-  const scheduled = (program ? programDays(program) : days)
+  const scheduled = (program ? programDays(program, map) : calendar(map))
     .filter((d) => d.sections.length && deadline(d, map) <= today)
     .sort(
       (a, b) => deadline(a, map).localeCompare(deadline(b, map)) || a.date.localeCompare(b.date),
@@ -469,6 +614,7 @@ export function validEventData(entity: string, data: any): boolean {
   if (entity.startsWith('config:'))
     return Number.isInteger(data.count) && data.count >= 1 && data.count <= 20;
   if (entity.startsWith('stage:')) return str(data.variation) && data.variation.length > 0;
+  if (entity.startsWith('repeat:')) return date(data.start) && str(data.program) && str(data.week);
   if (entity.startsWith('clock:'))
     return (
       Number.isFinite(data.elapsed) &&
@@ -489,7 +635,9 @@ export function validateEvents(value: unknown): value is Event[] {
         /^[\w-]{1,100}$/.test(e.id) &&
         typeof e.entity === 'string' &&
         e.entity.length < 250 &&
-        /^(set|completion|session|config|stage|notes|schedule|legacy|clock):/.test(e.entity) &&
+        /^(set|completion|session|config|stage|notes|schedule|legacy|clock|repeat):/.test(
+          e.entity,
+        ) &&
         validEventData(e.entity, e.data) &&
         Array.isArray(e.parents) &&
         e.parents.length <= 100 &&
@@ -507,7 +655,7 @@ export type Screen = { view: 'today' | 'schedule' | 'progress'; date?: string };
 export function screenFromHash(hash: string): Screen {
   const [, view, date] = hash.replace(/^#/, '').split('/');
   if (view === 'schedule' || view === 'progress') return { view };
-  if (view === 'workout' && days.some((d) => d.date === date)) return { view: 'today', date };
+  if (view === 'workout' && /^\d{4}-\d{2}-\d{2}$/.test(date)) return { view: 'today', date };
   return { view: 'today' };
 }
 export const hashForScreen = ({ view, date }: Screen) =>

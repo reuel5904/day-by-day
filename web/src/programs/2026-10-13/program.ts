@@ -2640,7 +2640,7 @@ export default {
     },
     {
       code: 'W4',
-      title: 'Full volume, hollow Tier 2, Thanksgiving',
+      title: 'Full volume, hollow Tier 2',
       note: 'Bulgarians at 3×15/leg clean? Move to Tempo Bulgarian (3s down, 1s pause).',
       days: [
         {
@@ -2934,7 +2934,7 @@ export default {
         },
         {
           date: '2026-11-26',
-          title: 'Run + Core (Thanksgiving)',
+          title: 'Run + Core',
           sections: [
             {
               id: 'b0',
@@ -4719,7 +4719,7 @@ export default {
     },
     {
       code: 'W8',
-      title: 'Deload (Christmas week)',
+      title: 'Deload',
       note: '2 sets on every exercise and stay on the same variation as W7. Pull-ups and chin-ups: stop 2 reps shy of your best. Everything else: stop 2 reps shy of the top of its range. No strides.',
       days: [
         {
@@ -5090,7 +5090,7 @@ export default {
         },
         {
           date: '2026-12-25',
-          title: 'Strength (deload, Christmas)',
+          title: 'Strength (deload)',
           sections: [
             {
               id: 'b0',
@@ -5584,7 +5584,7 @@ export default {
         },
         {
           date: '2027-01-01',
-          title: "Strength (New Year's Day)",
+          title: 'Strength',
           sections: [
             {
               id: 'b0',

@@ -42,6 +42,8 @@ import {
   clockKey,
   clockOf,
   clockSeconds,
+  calendar,
+  canUndoRepeat,
   clockStops,
   type Clock,
   completionChanges,
@@ -52,7 +54,7 @@ import {
   isSetComplete,
   dateLabel,
   Day,
-  days,
+  earliestRepeat,
   effectiveDate,
   Event,
   Exercise,
@@ -67,9 +69,13 @@ import {
   mondayOf,
   moveWorkout,
   pauseClock,
+  previewRepeat,
   programAt,
   programDays,
   prescriptionLine,
+  repeatChanges,
+  repeatKey,
+  type Repeat,
   resultEntries,
   Section,
   setKey,
@@ -117,7 +123,8 @@ const idleTimer: TimerState = {
   label: 'Ready when you are',
   running: false,
 };
-const firstToday = (today: string) => days.find((d) => d.date >= today)?.date || days.at(-1)!.date;
+const firstToday = (days: Day[], today: string) =>
+  days.find((d) => d.date >= today)?.date || days.at(-1)!.date;
 const remainingAt = (t: TimerState) =>
   t.running && t.end ? Math.max(0, Math.ceil((t.end - Date.now()) / 1000)) : t.remaining;
 // Only the countdown re-renders while a timer runs, not the whole app.
@@ -186,8 +193,6 @@ export default function TrainingApp({ user }: { user: User }) {
   };
   const view = screen.view;
   const [today, setToday] = useState(() => localDate());
-  const selected = screen.date ?? firstToday(today);
-  const finished = view === 'today' && !screen.date ? finishedProgramAt(today) : null;
   const [store, setStore] = useState<Store>({ events: [], pending: [] });
   const storeRef = useRef<Store>(store);
   const [loaded, setLoaded] = useState(false);
@@ -197,7 +202,7 @@ export default function TrainingApp({ user }: { user: User }) {
     [],
   );
   const [settings, setSettings] = useState(false);
-  const [modal, setModal] = useState<'finish' | 'move' | 'timer' | 'clock' | null>(null);
+  const [modal, setModal] = useState<'finish' | 'move' | 'repeat' | 'timer' | 'clock' | null>(null);
   const [customMinutes, setCustomMinutes] = useState('1');
   const [customSeconds, setCustomSeconds] = useState('30');
   const [customTimerError, setCustomTimerError] = useState('');
@@ -207,6 +212,7 @@ export default function TrainingApp({ user }: { user: User }) {
   const [actualDate, setActualDate] = useState('');
   const [loggingDate, setLoggingDate] = useState(() => localDate());
   const [moveDate, setMoveDate] = useState('');
+  const [repeat, setRepeat] = useState<Repeat | null>(null);
   const [note, setNote] = useState('');
   const [sound, setSound] = useState<AlarmSoundId>('classic');
   const [muted, setMuted] = useState(false);
@@ -264,7 +270,11 @@ export default function TrainingApp({ user }: { user: User }) {
     };
   }, []);
   const map = useMemo(() => heads(store.events), [store.events]);
-  const day = days.find((d) => d.date === selected) || days[0];
+  const days = calendar(map);
+  const chosen = screen.date && days.some((d) => d.date === screen.date) ? screen.date : null;
+  const selected = chosen ?? firstToday(days, today);
+  const finished = view === 'today' && !chosen ? finishedProgramAt(today, map) : null;
+  const day = days.find((d) => d.date === selected)!;
   const status = workoutStatus(day, map, today);
   const recordedSessionDate = status.actualDate;
   useEffect(
@@ -729,10 +739,10 @@ export default function TrainingApp({ user }: { user: User }) {
     .filter((r: any, i: number, list: any[]) => list.findIndex((x) => sameResult(x, r)) === i)
     .slice(0, 3);
   const originalChecks = latest(map, `legacy:${selected}`)?.checks || [];
-  const program = programAt(day.date);
+  const program = programAt(day.date, map);
   const weekIndex = program.weeks.indexOf(day.code) + 1;
-  const currentProgram = programAt(today);
-  const programLength = programDays(currentProgram).length;
+  const currentProgram = programAt(today, map);
+  const programLength = programDays(currentProgram, map).length;
   const dayNumber = Math.max(
     1,
     Math.min(
@@ -979,7 +989,7 @@ export default function TrainingApp({ user }: { user: User }) {
       (b.status.actualDate || b.day.date).localeCompare(a.status.actualDate || a.day.date),
     )
     .slice(0, 10);
-  const totalComplete = programDays(program).filter(
+  const totalComplete = programDays(program, map).filter(
     (d) => d.sections.length && isFinished(workoutStatus(d, map, today)),
   ).length;
   const trendNames = Array.from(
@@ -1015,6 +1025,13 @@ export default function TrainingApp({ user }: { user: User }) {
     });
     setModal(null);
     notify('Workout moved. The original date remains in its history.');
+  };
+  const repeatPreview = repeat && previewRepeat(map, repeat, today);
+  const confirmRepeat = () => {
+    if (!repeat || repeatPreview?.problem) return;
+    writeMany(repeatChanges(map, repeat));
+    setModal(null);
+    notify(`${repeat.week} repeats from ${dateLabel(repeat.start)}. Later weeks moved back.`);
   };
 
   return (
@@ -1717,26 +1734,27 @@ export default function TrainingApp({ user }: { user: User }) {
               <div className="schedule-intro">
                 <Flag size={23} />
                 <div>
-                  <strong>{programDays(program).length} days of building something.</strong>
+                  <strong>{programDays(program, map).length} days of building something.</strong>
                   <p>
                     {totalComplete} of{' '}
-                    {programDays(program).filter((d) => d.sections.length).length} workouts
+                    {programDays(program, map).filter((d) => d.sections.length).length} workouts
                     completed · {program.note}
                   </p>
                 </div>
               </div>
               <div className="schedule-weeks">
                 {program.weeks.map((code) => {
-                  const list = programDays(program).filter((d) => d.code === code);
+                  const list = programDays(program, map).filter((d) => d.code === code);
                   return (
                     <details className="schedule-week" key={code} open={code === day.code}>
                       <summary>
                         <div>
-                          <span className="week-code">{code}</span>
+                          <span className="week-code">{list[0].week}</span>
                           <div>
                             <h2>{list[0].phase}</h2>
                             <span>
                               {dateLabel(list[0].date)} — {dateLabel(list.at(-1)!.date)}
+                              {code !== list[0].week && ' · Repeat'}
                             </span>
                           </div>
                         </div>
@@ -1783,6 +1801,33 @@ export default function TrainingApp({ user }: { user: User }) {
                             </button>
                           );
                         })}
+                      </div>
+                      <div className="schedule-week-actions">
+                        {canUndoRepeat(map, list[0].date) && (
+                          <button
+                            className="text-link"
+                            onClick={() => {
+                              write(repeatKey(list[0].date), null);
+                              notify('Repeat undone. The weeks after it moved back into place.');
+                            }}
+                          >
+                            Undo this repeat
+                            <RotateCcw size={15} />
+                          </button>
+                        )}
+                        {list[0].date <= today && (
+                          <button
+                            className="text-link"
+                            onClick={() => {
+                              const week = { program: program.id, week: list[0].week };
+                              setRepeat({ ...week, start: earliestRepeat(map, week, today) });
+                              setModal('repeat');
+                            }}
+                          >
+                            Repeat this week
+                            <ArrowRight size={15} />
+                          </button>
+                        )}
                       </div>
                     </details>
                   );
@@ -2031,11 +2076,13 @@ export default function TrainingApp({ user }: { user: User }) {
                 ? 'Settings and backup'
                 : modal === 'finish'
                   ? 'Finish early'
-                  : modal === 'timer'
-                    ? 'Custom timer'
-                    : modal === 'clock'
-                      ? 'Edit workout time'
-                      : 'Reschedule workout'
+                  : modal === 'repeat'
+                    ? 'Repeat a week'
+                    : modal === 'timer'
+                      ? 'Custom timer'
+                      : modal === 'clock'
+                        ? 'Edit workout time'
+                        : 'Reschedule workout'
             }
             onClick={(e) => e.stopPropagation()}
           >
@@ -2150,6 +2197,51 @@ export default function TrainingApp({ user }: { user: User }) {
                     ))}
                   </div>
                 )}
+              </>
+            ) : modal === 'repeat' && repeat ? (
+              <>
+                <span className="eyebrow">MAKE ROOM FOR LIFE</span>
+                <h2>Repeat {repeat.week}.</h2>
+                <p className="modal-description">
+                  {repeat.week} runs again from the date you choose, and every week after it
+                  follows. Earlier workouts and their results stay as they are, including missed
+                  ones.
+                </p>
+                <label className="field-label">
+                  Start date
+                  <input
+                    type="date"
+                    min={earliestRepeat(map, repeat, today)}
+                    step={7}
+                    value={repeat.start}
+                    onChange={(ev) => setRepeat({ ...repeat, start: ev.target.value })}
+                  />
+                </label>
+                {repeatPreview?.problem ? (
+                  <div className="notice">{repeatPreview.problem}</div>
+                ) : (
+                  repeatPreview?.end && (
+                    <div className="notice">
+                      <CalendarDays size={17} />
+                      The program now ends{' '}
+                      {dateLabel(repeatPreview.end, {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                      .
+                    </div>
+                  )
+                )}
+                <button
+                  className="primary modal-primary"
+                  disabled={!!repeatPreview?.problem}
+                  onClick={confirmRepeat}
+                >
+                  <RotateCcw size={18} />
+                  Repeat {repeat.week}
+                </button>
               </>
             ) : modal === 'timer' ? (
               <>

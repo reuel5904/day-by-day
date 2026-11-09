@@ -11,7 +11,7 @@ Each program lives in `web/src/programs/<start date>/`: `roadmap.md` is the road
 1. **Save the roadmap** as `web/src/programs/<date of its first workout, YYYY-MM-DD>/roadmap.md`.
 2. **Convert it** to `program.ts`, a default-exported `ProgramData` (the type, with its optional fields, is in `web/src/training-model.ts`):
    - `id` is the start date and `note` the roadmap's program-wide note. Ask the owner for `title` and `summary` when the roadmap gives none.
-   - Each week comes from its `## code · dates · title` heading, with the line under it as its `note`. Every calendar date the roadmap covers is a day, titled from its bold heading without remarks such as "(today)"; a rest day has `sections: []`.
+   - Each week comes from its `## code · dates · title` heading, with the line under it as its `note`. Every calendar date the roadmap covers is a day, titled from its bold heading without remarks such as "(today)" or a holiday name, since a repeated week can move any workout to another date; a rest day has `sections: []`.
    - Each exercise or superset is one section, with its roadmap wording as `text` minus markdown; a line that lists several exercises becomes several sections. `kind` is `prep` for warm-up, cool-down and mobility (one `check` exercise, optional for completion), `run` (strides join the run's section), `superset` or `exercise`.
    - `rest` is in seconds. A line that gives no rest takes the rest the same exercise had most recently.
    - Section IDs run `b0`, `b1`, … in order, and exercise IDs `b1e0`, `b1e1`, … within their section. `count` is the number of sets. `unit` is `reps`, `sec`, `run` (miles) or `check`. `target` is one number (`'20'`), a range (`'8-15'`), or absent for a max test.
@@ -21,7 +21,7 @@ Each program lives in `web/src/programs/<start date>/`: `roadmap.md` is the road
 5. **Register the program** in `web/src/programs/index.ts`, in date order. Programs never overlap.
 6. **Add tests** to `scripts/test-pages.mjs` for the program's day count, first and last dates, and every conversion that needed a judgement call. Existing tests describe earlier programs: where one fails on the new program's days, scope it to its own program. Run the checks, then open `#/workout/<date>` on the dev server for a superset day, a run day and a test day.
 
-Saved results are keyed by workout date and exercise ID (`set:<date>:<exercise id>:<set>`), so a workout that has results keeps its date, IDs, set counts and units. Correcting a program already in use changes only workouts without results.
+Saved results are keyed by workout date and exercise ID (`set:<date>:<exercise id>:<set>`), so a workout that has results keeps its date, IDs, set counts and units. Correcting a program already in use changes only workouts without results. A repeated week follows the same rule, and is the owner's choice in the app, not a change to `program.ts` (ADR-0009).
 
 The program is loaded when every exercise in the roadmap is in a section, every question has an answer, and the checks pass.
 

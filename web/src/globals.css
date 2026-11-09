@@ -1337,6 +1337,16 @@ main {
 .schedule-week[open] summary > svg {
   transform: rotate(180deg);
 }
+.schedule-week-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 0 16px 14px;
+}
+.schedule-week-actions:empty {
+  display: none;
+}
 .schedule-days {
   padding: 0 20px 10px;
 }

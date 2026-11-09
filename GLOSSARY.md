@@ -7,8 +7,16 @@ Day by Day supports following a training program and understanding training cons
 ### Program structure
 
 **Program**:
-A dated sequence of workouts with a fixed start and end, followed one at a time.
+A dated sequence of workouts with a fixed start and an end that only a repeated week can move, followed one at a time.
 _Avoid_: Plan, routine, roadmap, block
+
+**Week**:
+A named stretch of a program's workouts, such as R3 or W1.
+_Avoid_: Phase, calendar week
+
+**Repeated week**:
+A week run again as new workouts on later dates, with every later week sliding back by the same delay. The earlier workouts and their results stay as they were.
+_Avoid_: Moved week, skipped week
 
 **Workout**:
 One day's prescribed training in a program, made up of sections.
@@ -29,7 +37,7 @@ _Avoid_: Planned rest, scheduled rest, recovery day
 ### Dates and consistency
 
 **Original date**:
-The date the program assigns to a workout. It never changes, even when the workout is moved.
+The date the program assigns to a workout. Moving the workout never changes it; only a repeated week can, and only for a workout with nothing logged.
 _Avoid_: Scheduled date, actual training date
 
 **Scheduled date**:

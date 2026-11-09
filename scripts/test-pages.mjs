@@ -9,7 +9,15 @@ await build({
   outExtension: { '.js': '.mjs' },
 });
 const {
-  days,
+  calendar,
+  programsIn,
+  canUndoRepeat,
+  earliestRepeat,
+  lastLoggedDate,
+  previewRepeat,
+  repeatChanges,
+  repeatKey,
+  validEventData,
   heads,
   latest,
   streaks,
@@ -40,6 +48,7 @@ const {
   formatDuration,
 } = await import('../.work/pages-test/training-model.mjs');
 const { EXERCISES } = await import('../.work/pages-test/exercises.mjs');
+const days = calendar({});
 let count = 0;
 function test(name, fn) {
   fn();
@@ -451,10 +460,10 @@ test('A section that tests one exercise twice is headed by its name once', () =>
   );
 });
 test('Today summarizes a program once its last day has passed', () => {
-  assert.equal(finishedProgramAt('2026-10-22'), null);
-  assert.equal(finishedProgramAt('2027-01-10'), null);
-  assert.equal(finishedProgramAt('2027-01-11').id, '2026-10-13');
-  assert.equal(finishedProgramAt('2026-10-01'), null);
+  assert.equal(finishedProgramAt('2026-10-22', {}), null);
+  assert.equal(finishedProgramAt('2027-01-10', {}), null);
+  assert.equal(finishedProgramAt('2027-01-11', {}).id, '2026-10-13');
+  assert.equal(finishedProgramAt('2026-10-01', {}), null);
 });
 test('The URL keeps the screen and the chosen day', () => {
   assert.deepEqual(screenFromHash('#/workout/2026-10-22'), { view: 'today', date: '2026-10-22' });
@@ -465,8 +474,8 @@ test('The URL keeps the screen and the chosen day', () => {
   assert.equal(hashForScreen({ view: 'progress' }), '#/progress');
   assert.equal(hashForScreen({ view: 'today' }), '#/');
 });
-test('A URL for a day outside every program, or an unknown screen, opens Today', () => {
-  for (const hash of ['#/workout/2099-01-01', '#/workout/oops', '#/settings', '#'])
+test('A URL with an unknown screen or a malformed date opens Today', () => {
+  for (const hash of ['#/workout/oops', '#/settings', '#'])
     assert.deepEqual(screenFromHash(hash), { view: 'today' });
 });
 test('A history with imported completions still validates', () => {
@@ -584,5 +593,113 @@ test('Workout times read as a clock while running and in minutes once recorded',
   assert.equal(formatClock(3725), '1:02:05');
   assert.equal(formatDuration(2880), '48 min');
   assert.equal(formatDuration(4380), '1 h 13 min');
+});
+const repeatEvent = (start, week = 'W1') =>
+  event(`repeat-${start}`, repeatKey(start), { program: '2026-10-13', week, start });
+const withRepeat = (...events) => heads([repeatEvent('2026-11-09'), ...events]);
+test('Repeating W1 from Nov 9 slides the rest of the program back a week', () => {
+  const map = withRepeat();
+  const repeated = calendar(map);
+  assert.equal(repeated.length, 97);
+  assert.equal(new Set(repeated.map((d) => d.date)).size, 97);
+  assert.equal(programsIn(map)[0].end, '2027-01-17');
+  assert.equal(repeated.find((d) => d.date === '2027-01-16').title, '5K Victory Lap');
+  const nov9 = repeated.find((d) => d.date === '2026-11-09');
+  assert.equal(nov9.code, 'W1 (repeat)');
+  assert.equal(nov9.week, 'W1');
+  assert.equal(nov9.sections[1].text, days.find((d) => d.date === '2026-11-02').sections[1].text);
+  assert.equal(repeated.find((d) => d.date === '2026-11-16').code, 'W2');
+  assert.equal(programsIn(map)[0].weeks.slice(2, 6).join(), 'R3,W1,W1 (repeat),W2');
+});
+test('A repeated week leaves earlier workouts and their results alone', () => {
+  const map = withRepeat(...tick('2026-11-02', requiredSets('2026-11-02')));
+  const original = calendar(map).find((d) => d.date === '2026-11-02');
+  assert.equal(original.code, 'W1');
+  assert.equal(workoutStatus(original, map, '2026-11-07').id, 'complete');
+  const missed = calendar(map).find((d) => d.date === '2026-11-03');
+  assert.equal(workoutStatus(missed, map, '2026-11-07').id, 'empty');
+  const again = calendar(map).find((d) => d.date === '2026-11-09');
+  assert.equal(workoutStatus(again, map, '2026-11-07').id, 'upcoming');
+});
+test('A second repeat rewinds again and is labeled by how often the week has run', () => {
+  const map = heads([repeatEvent('2026-11-09'), repeatEvent('2026-11-16')]);
+  const repeated = calendar(map);
+  assert.equal(repeated.find((d) => d.date === '2026-11-16').code, 'W1 (repeat 2)');
+  assert.equal(repeated.find((d) => d.date === '2026-11-23').code, 'W2');
+  assert.equal(programsIn(map)[0].end, '2027-01-24');
+});
+test('Choosing an earlier week runs every week after it again', () => {
+  const map = heads([repeatEvent('2026-11-09', 'R3')]);
+  const repeated = calendar(map);
+  assert.equal(repeated.find((d) => d.date === '2026-11-09').code, 'R3 (repeat)');
+  assert.equal(repeated.find((d) => d.date === '2026-11-16').code, 'W1 (repeat)');
+  assert.equal(programsIn(map)[0].end, '2027-01-24');
+});
+const w1 = { program: '2026-10-13', week: 'W1' };
+test('A repeat starts on its week’s weekday, today or later, after everything logged', () => {
+  assert.equal(earliestRepeat({}, w1, '2026-11-07'), '2026-11-09');
+  assert.equal(earliestRepeat({}, w1, '2026-11-09'), '2026-11-09');
+  // R1 starts on a Tuesday.
+  assert.equal(earliestRepeat({}, { ...w1, week: 'R1' }, '2026-11-07'), '2026-11-10');
+  const logged = heads(tick('2026-11-09', requiredSets('2026-11-09'), '2026-11-07'));
+  assert.equal(lastLoggedDate(logged), '2026-11-09');
+  assert.equal(earliestRepeat(logged, w1, '2026-11-07'), '2026-11-16');
+  assert.ok(previewRepeat(logged, { ...w1, start: '2026-11-09' }, '2026-11-07').problem);
+  assert.ok(previewRepeat({}, { ...w1, start: '2026-11-10' }, '2026-11-07').problem);
+  assert.equal(previewRepeat({}, { ...w1, start: '2026-11-09' }, '2026-11-07').end, '2027-01-17');
+  assert.equal(previewRepeat({}, { ...w1, start: '2026-11-16' }, '2026-11-07').end, '2027-01-24');
+});
+test('A tick taken back or an empty clock does not hold a date', () => {
+  const map = heads([
+    event('unticked', 'completion:2026-11-09:b1e0:0', {
+      completed: false,
+      day: '2026-11-09',
+      actualDate: '2026-11-07',
+    }),
+    event('idle', 'clock:2026-11-09', { elapsed: 0, since: null }),
+  ]);
+  assert.equal(lastLoggedDate(map), '');
+});
+test('A repeat clears moves and set counts on the dates it takes over, and no others', () => {
+  const map = heads([
+    event('future-move', 'schedule:2026-11-20', {
+      due: '2026-11-21',
+      originalDate: '2026-11-20',
+      lateMove: false,
+    }),
+    event('missed-move', 'schedule:2026-11-05', {
+      due: '2026-11-10',
+      originalDate: '2026-11-05',
+      lateMove: true,
+    }),
+    event('future-count', 'config:2026-11-20:b1e0', { count: 4 }),
+  ]);
+  const changes = repeatChanges(map, { ...w1, start: '2026-11-09' });
+  assert.deepEqual(changes.map((c) => c.entity).sort(), [
+    'config:2026-11-20:b1e0',
+    'repeat:2026-11-09',
+    'schedule:2026-11-20',
+  ]);
+  assert.equal(changes.find((c) => c.entity === 'schedule:2026-11-20').data, null);
+});
+test('A repeat can be undone until something is logged from its start on', () => {
+  assert.equal(canUndoRepeat(withRepeat(), '2026-11-09'), true);
+  assert.equal(canUndoRepeat(withRepeat(), '2026-11-16'), false);
+  const earlier = withRepeat(...tick('2026-11-02', requiredSets('2026-11-02')));
+  assert.equal(canUndoRepeat(earlier, '2026-11-09'), true);
+  const logged = withRepeat(...tick('2026-11-09', requiredSets('2026-11-09')));
+  assert.equal(canUndoRepeat(logged, '2026-11-09'), false);
+  const undone = heads([
+    repeatEvent('2026-11-09'),
+    event('undo', repeatKey('2026-11-09'), null, ['repeat-2026-11-09']),
+  ]);
+  assert.equal(calendar(undone).length, 90);
+  assert.equal(programsIn(undone)[0].end, '2027-01-10');
+  assert.equal(canUndoRepeat(undone, '2026-11-09'), false);
+});
+test('Repeat events validate, and malformed ones are rejected', () => {
+  assert.equal(validateEvents([repeatEvent('2026-11-09')]), true);
+  assert.equal(validEventData('repeat:2026-11-09', { program: 'x', week: 'W1' }), false);
+  assert.equal(validEventData('repeat:2026-11-09', null), true);
 });
 console.log(`\n${count} domain and data-integrity checks passed.`);

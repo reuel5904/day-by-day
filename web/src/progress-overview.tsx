@@ -13,7 +13,7 @@ export default function ProgressOverview({
   streak: { current: number; best: number };
   onChoose: (date: string) => void;
 }) {
-  const program = programAt(today);
+  const program = programAt(today, map);
   const summary = progressSummary(map, today, program);
   const stats = [
     {

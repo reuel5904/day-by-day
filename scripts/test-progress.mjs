@@ -10,8 +10,10 @@ await build({
 });
 const { progressSummary, calendarDay, programSummary } =
   await import('../.work/progress-test/progress-model.mjs');
-const { days, heads, completionChanges, setKey, streaks, workoutStatus, programs } =
+const { calendar, programsIn, heads, completionChanges, setKey, streaks, workoutStatus } =
   await import('../.work/progress-test/training-model.mjs');
+const days = calendar({});
+const programs = programsIn({});
 const event = (id, entity, data, parents = []) => ({
   id,
   entity,
