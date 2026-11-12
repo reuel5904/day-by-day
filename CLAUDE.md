@@ -1,12 +1,40 @@
 # day-by-day
 
-## Workflow
+## Read first
 
-Commit straight to `main`, one issue at a time, and use a branch only when a change really needs one. This repo's rule replaces the usual feature-branch default. Before each commit, run the checks `.github/workflows/deploy.yml` runs; a push to `main` deploys only when they pass. End an issue's last commit with `Closes #N`.
+1. `GLOSSARY.md`, the training vocabulary. Use its terms in conversation, code, and file names.
+2. `docs/adr/`: each ADR for the area a task touches. Do not reopen a decided question without new information.
+3. `CODING_STANDARDS.md`, the rules the review enforces on every diff.
+
+## Working with Reuel
+
+- Reuel is the only developer and the app's only user.
+- Reuel works in **both the Claude desktop app and T3 Code**: keep every setup and doc working in both, never one at the other's cost.
+- **Questions go in chat**, numbered, each with a recommended answer.
+- **Before writing a ticket wrap-up**, read `docs/agents/wrap-up.md`.
+- **Before writing a PR body**, read `docs/agents/pr-bodies.md`.
+- Keep answers scannable: short sections, tight bullets, clear next step. No em dashes.
+
+## Git
+
+- **Every change reaches `main` through a PR**, one issue per PR, squash merged. Agents never push to `main`, and a ruleset on GitHub refuses it anyway.
+- **Each branch gets its own worktree.** Before starting one (a session outside `.claude/worktrees/`) or removing a merged one, read `docs/agents/worktrees.md`.
+- **In a worktree:** Write and Edit for files, one plain command per Bash call, and `--body-file` for `gh` bodies; the isolation guard refuses the rest (`docs/agents/worktrees.md` lists it).
+- **Branch names** start `feat/` (refactors too), `fix/` or `chore/`. **PR titles** are Conventional Commits scoped to one of `today`, `schedule`, `progress`, `timer`, `sync`, `program`, `docs`, `ci` or `deps`, such as `feat(schedule): repeat a week`. The PR body says `Closes #N`.
+- A PR's CI runs the checks in `.github/workflows/deploy.yml`, and a merge deploys to GitHub Pages: **a merge is a release**.
+- **Before a merge**, check that CI passed (`gh pr checks <pr>`), every box on the issue the PR closes is ticked, and nothing in the PR or its commits credits Claude. Tell Reuel about any conflict first, and merge only once Reuel says to, with `gh pr merge <pr> --squash --delete-branch`.
+
+## Workflow skills
+
+- **Before grilling an issue**, read `docs/agents/grilling.md`.
+- **Before staging for `/implement`'s review, making a fix commit, or running an after-merge step** on any PR, read `docs/agents/implement.md`.
+- Every PR, before it merges, runs **the review** (`docs/agents/implement.md`, The review), whether `/implement` made it or not. **Its results go in the chat before the merge question, never on the PR.**
+- **Questions about Claude Code itself** (permission rules, settings, hooks) go to the `claude-code-guide` agent, which reads its docs.
+- User-invoked skills (`/implement`, `/triage`, others marked `disable-model-invocation`) aren't in the skill list. To run one, follow `~/.claude/plugins/cache/mattpocock/mattpocock-skills/<version>/skills/<category>/<name>/SKILL.md`.
 
 ## Loading a new program
 
-Each program lives in `web/src/programs/<start date>/`: `roadmap.md` is the roadmap as written and `program.ts` its structured data (ADR-0006). `web/src/programs/2026-10-13/` is the worked example; copy its shapes.
+Each program lives in `web/src/programs/<start date>/`: `roadmap.md` is the roadmap as written and `program.ts` its structured data (ADR-0006). `web/src/programs/2026-10-13/` is the worked example; copy its shapes. A new program is one PR, titled `feat(program): load the <start date> program`.
 
 1. **Save the roadmap** as `web/src/programs/<date of its first workout, YYYY-MM-DD>/roadmap.md`.
 2. **Convert it** to `program.ts`, a default-exported `ProgramData` (the type, with its optional fields, is in `web/src/training-model.ts`):
