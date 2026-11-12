@@ -1,5 +1,6 @@
 import { CalendarDays, Check, Dumbbell, Flame, Footprints, Leaf, ListChecks } from 'lucide-react';
-import { addDays, dateLabel, programAt, type Event } from './training-model';
+import { Fragment, useLayoutEffect, useRef } from 'react';
+import { addDays, dateLabel, type Event } from './training-model';
 import { calendarDay, progressSummary } from './progress-model';
 
 export default function ProgressOverview({
@@ -13,24 +14,43 @@ export default function ProgressOverview({
   streak: { current: number; best: number };
   onChoose: (date: string) => void;
 }) {
-  const program = programAt(today, map);
-  const summary = progressSummary(map, today, program);
+  const summary = progressSummary(map, today);
+  // The week both charts open on: this one, or the nearest the programs cover.
+  const openingWeek =
+    summary.thisWeek ??
+    summary.weeks.filter((week) => week.start <= today).at(-1) ??
+    summary.weeks[0];
+  const weeklyScroll = useRef<HTMLDivElement>(null);
+  const rhythmScroll = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    for (const scroller of [weeklyScroll.current, rhythmScroll.current]) {
+      const opening = scroller?.querySelector('[data-opening]');
+      if (!scroller || !opening) continue;
+      const box = scroller.getBoundingClientRect(),
+        target = opening.getBoundingClientRect();
+      scroller.scrollLeft += target.left - box.left - (box.width - target.width) / 2;
+      scroller.scrollTop += target.top - box.top - (box.height - target.height) / 2;
+    }
+  }, []);
   const stats = [
     {
       label: 'Completed workouts',
       value: summary.completed,
+      thisProgram: summary.thisProgram.completed,
       detail: `${summary.partial} partial · ${summary.inProgress} in progress`,
       icon: <Dumbbell size={20} />,
     },
     {
       label: 'Sets completed',
       value: summary.sets,
+      thisProgram: summary.thisProgram.sets,
       detail: 'Checked strength, core & hold sets',
       icon: <ListChecks size={20} />,
     },
     {
       label: 'Active training days',
       value: summary.activeDays,
+      thisProgram: summary.thisProgram.activeDays,
       detail: 'Days with dated activity, including partials',
       icon: <CalendarDays size={20} />,
     },
@@ -50,7 +70,10 @@ export default function ProgressOverview({
               <span>{stat.label}</span>
               {stat.icon}
             </div>
-            <strong>{stat.value}</strong>
+            <strong>
+              {stat.value}
+              {stat.thisProgram !== undefined && <small>{stat.thisProgram} this program</small>}
+            </strong>
             <p>{stat.detail}</p>
           </section>
         ))}
@@ -64,14 +87,18 @@ export default function ProgressOverview({
             </div>
             <span>Finished / planned</span>
           </div>
-          <div className="weekly-history-scroll">
+          <div className="weekly-history-scroll" ref={weeklyScroll}>
             <div className="weekly-history-chart">
               {summary.weeks.map((week) => (
                 <div
-                  className={`weekly-history-column ${week.start > today ? 'future-week' : ''} ${week === summary.thisWeek ? 'current-week' : ''}`}
+                  className={`weekly-history-column ${week.start > today ? 'future-week' : ''} ${week === summary.thisWeek ? 'current-week' : ''} ${week.programStart ? 'program-start' : ''}`}
                   key={week.start}
+                  data-opening={week === openingWeek || undefined}
                   title={`${dateLabel(week.start)}: ${week.completed} of ${week.planned} workouts complete, ${week.partial} partial`}
                 >
+                  <span className="weekly-history-program">
+                    {week.programStart && <b>{week.programStart.title}</b>}
+                  </span>
                   <span>
                     {week.completed}
                     <small>/{week.planned}</small>
@@ -100,14 +127,20 @@ export default function ProgressOverview({
               <Dumbbell size={18} />
               Strength workouts
             </span>
-            <strong>{summary.strength}</strong>
+            <strong>
+              {summary.strength}
+              <small className="this-program">{summary.thisProgram.strength} this program</small>
+            </strong>
           </div>
           <div className="training-mix-row">
             <span>
               <Footprints size={18} />
               Running workouts
             </span>
-            <strong>{summary.runs}</strong>
+            <strong>
+              {summary.runs}
+              <small className="this-program">{summary.thisProgram.runs} this program</small>
+            </strong>
           </div>
           <div className="training-mix-row">
             <span>
@@ -116,6 +149,9 @@ export default function ProgressOverview({
             </span>
             <strong>
               {summary.distance.toFixed(1)} <small>mi</small>
+              <small className="this-program">
+                {summary.thisProgram.distance.toFixed(1)} mi this program
+              </small>
             </strong>
           </div>
           <div className="progress-streaks">
@@ -136,7 +172,7 @@ export default function ProgressOverview({
             <h2>Your training rhythm</h2>
           </div>
           <span>
-            {dateLabel(program.start)} — {dateLabel(program.end)}
+            {dateLabel(summary.start)} — {dateLabel(summary.end)}
           </span>
         </div>
         <div className="recovery-note">
@@ -150,7 +186,7 @@ export default function ProgressOverview({
             </p>
           </div>
         </div>
-        <div className="rhythm-calendar">
+        <div className="rhythm-calendar" ref={rhythmScroll}>
           <div className="rhythm-labels">
             <span />
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
@@ -158,37 +194,44 @@ export default function ProgressOverview({
             ))}
           </div>
           {summary.weeks.map((week) => (
-            <div className="rhythm-week" key={week.start}>
-              <span className="rhythm-week-label">{dateLabel(week.start)}</span>
-              {Array.from({ length: 7 }, (_, i) => {
-                const date = addDays(week.start, i);
-                if (date < program.start || date > program.end)
-                  return <span className="rhythm-placeholder" key={date} />;
-                const { status, target, workoutCount } = calendarDay(date, map, today);
-                return (
-                  <button
-                    key={date}
-                    disabled={!target}
-                    className={`rhythm-day ${status.id} ${date === today ? 'rhythm-today' : ''}`}
-                    onClick={() => target && onChoose(target.date)}
-                    title={`${dateLabel(date)} · ${status.label}${workoutCount > 1 ? ` · ${workoutCount} workouts` : ''}`}
-                    aria-label={`${dateLabel(date, { weekday: 'long', month: 'short', day: 'numeric' })}, ${status.label}${workoutCount > 1 ? `, ${workoutCount} workouts` : ''}`}
-                  >
-                    <span>{dateLabel(date, { day: 'numeric' })}</span>
-                    {status.id === 'rest' ? (
-                      <span className="rhythm-rest">
-                        <Leaf size={12} />
-                        Rest
-                      </span>
-                    ) : status.id === 'complete' || status.id === 'legacy' ? (
-                      <Check size={13} />
-                    ) : status.id === 'started' || status.id === 'partial' ? (
-                      <span className="rhythm-dot" />
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
+            <Fragment key={week.start}>
+              {week.programStart && (
+                <div className="rhythm-program">
+                  <b>{week.programStart.title}</b> starts {dateLabel(week.programStart.start)}
+                </div>
+              )}
+              <div className="rhythm-week" data-opening={week === openingWeek || undefined}>
+                <span className="rhythm-week-label">{dateLabel(week.start)}</span>
+                {Array.from({ length: 7 }, (_, i) => {
+                  const date = addDays(week.start, i);
+                  if (date < summary.start || date > summary.end)
+                    return <span className="rhythm-placeholder" key={date} />;
+                  const { status, target, workoutCount } = calendarDay(date, map, today);
+                  return (
+                    <button
+                      key={date}
+                      disabled={!target}
+                      className={`rhythm-day ${status.id} ${date === today ? 'rhythm-today' : ''}`}
+                      onClick={() => target && onChoose(target.date)}
+                      title={`${dateLabel(date)} · ${status.label}${workoutCount > 1 ? ` · ${workoutCount} workouts` : ''}`}
+                      aria-label={`${dateLabel(date, { weekday: 'long', month: 'short', day: 'numeric' })}, ${status.label}${workoutCount > 1 ? `, ${workoutCount} workouts` : ''}`}
+                    >
+                      <span>{dateLabel(date, { day: 'numeric' })}</span>
+                      {status.id === 'rest' ? (
+                        <span className="rhythm-rest">
+                          <Leaf size={12} />
+                          Rest
+                        </span>
+                      ) : status.id === 'complete' || status.id === 'legacy' ? (
+                        <Check size={13} />
+                      ) : status.id === 'started' || status.id === 'partial' ? (
+                        <span className="rhythm-dot" />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </Fragment>
           ))}
         </div>
         <p className="rhythm-help">Select a day to open its workout.</p>

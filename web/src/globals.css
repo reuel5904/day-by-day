@@ -4421,6 +4421,24 @@ main {
 .progress-stats .stat-card > strong {
   font-size: 38px;
   color: var(--green-text);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 15px;
+  overflow: hidden;
+}
+/* This program's number sits beside the all-time one, and drops below it in a narrow card. The
+   dot between them hangs left of the small text, so it is clipped away once that wraps. */
+.progress-stats .stat-card > strong small {
+  position: relative;
+  margin-left: 0;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.progress-stats .stat-card > strong small::before {
+  content: '·';
+  position: absolute;
+  left: -10px;
 }
 .progress-summary-grid {
   display: grid;
@@ -4456,18 +4474,42 @@ main {
 }
 .weekly-history-chart {
   display: grid;
-  grid-template-columns: repeat(13, minmax(28px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(34px, 1fr);
   gap: 7px;
-  min-width: 440px;
-  padding-top: 10px;
+  padding: 10px 3px 4px;
 }
 .weekly-history-column {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 7px;
   font-size: 13px;
   color: var(--green-text);
+}
+/* A rule down the left of the week a program starts in, with its title running over the weeks
+   after. The first week needs none: the chart starts there. */
+.weekly-history-column.program-start:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  border-left: 1px dashed var(--line-strong);
+}
+.weekly-history-program {
+  align-self: stretch;
+  height: 14px;
+  position: relative;
+}
+.weekly-history-program b {
+  position: absolute;
+  left: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--muted);
 }
 .weekly-history-column small {
   font-size: 10px;
@@ -4523,11 +4565,16 @@ main {
 }
 .training-mix-row > strong {
   font-size: 23px;
+  text-align: right;
   font-weight: 500;
   color: var(--green-text);
 }
 .training-mix-row small {
   font-size: 12px;
+}
+.training-mix-row .this-program {
+  display: block;
+  color: var(--muted);
 }
 .progress-streaks {
   display: flex;
@@ -4784,9 +4831,6 @@ main {
   .weekly-history-column {
     font-size: 12px;
   }
-  .weekly-history-chart {
-    min-width: 410px;
-  }
   .recovery-note {
     padding: 12px;
   }
@@ -4959,12 +5003,27 @@ main {
   stroke: var(--surface);
 }
 
-/* Progress calendar: one row per week, so it fits a phone without scrolling sideways. */
+/* Progress calendar: one row per week, so it fits a phone without scrolling sideways. It covers
+   every program, so it scrolls in its own box, which opens on the current week. */
 .rhythm-calendar {
   display: grid;
   grid-template-columns: none;
   gap: 5px;
   min-width: 0;
+  max-height: 372px;
+  overflow-y: auto;
+  padding: 0 3px 3px;
+}
+.rhythm-program {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line-strong);
+  font-size: 11px;
+  color: var(--muted);
+}
+.rhythm-program b {
+  font-weight: 600;
+  color: var(--ink);
 }
 .rhythm-labels,
 .rhythm-week {
@@ -4973,8 +5032,9 @@ main {
   gap: 5px;
 }
 .rhythm-labels {
-  position: static;
-  background: none;
+  top: 0;
+  left: auto;
+  padding: 3px 0;
 }
 .rhythm-labels > span {
   justify-content: center;

@@ -264,4 +264,80 @@ test('Personal bests compare results only within the same exercise variation', (
     ],
   );
 });
+const counts = ({ completed, sets, activeDays, strength, runs, distance }) => ({
+  completed,
+  sets,
+  activeDays,
+  strength,
+  runs,
+  distance,
+});
+test('The numbers are all-time, with the current program’s beside them', () => {
+  const first = ['2026-10-19', '2026-10-20', '2026-10-21'].flatMap((date) => tickAll(date));
+  const second = ['2026-11-16', '2026-11-17'].flatMap((date) => tickAll(date));
+  const summary = progressSummary(heads([...first, ...second]), '2026-11-18');
+  const firstOnly = counts(progressSummary(heads(first), '2026-11-15'));
+  const secondOnly = counts(progressSummary(heads(second), '2026-11-18'));
+  assert.deepEqual(firstOnly, { ...firstOnly, completed: 3, strength: 2, runs: 1, distance: 1.5 });
+  assert.deepEqual(secondOnly, { ...secondOnly, completed: 2, strength: 1, runs: 1 });
+  assert.ok(firstOnly.sets > 0 && secondOnly.sets > 0 && secondOnly.distance > 0);
+  assert.deepEqual(counts(summary.thisProgram), secondOnly);
+  assert.deepEqual(
+    counts(summary),
+    Object.fromEntries(
+      Object.keys(firstOnly).map((key) => [key, firstOnly[key] + secondOnly[key]]),
+    ),
+  );
+});
+test('All-time numbers do not drop when a new program starts, and this program’s restart', () => {
+  const map = heads(['2026-10-19', '2026-10-20', '2026-10-21'].flatMap((date) => tickAll(date)));
+  const lastDay = progressSummary(map, '2026-11-15');
+  const firstDay = progressSummary(map, '2026-11-16');
+  assert.deepEqual(counts(lastDay.thisProgram), counts(lastDay));
+  assert.deepEqual(counts(firstDay), counts(lastDay));
+  assert.deepEqual(counts(firstDay.thisProgram), {
+    completed: 0,
+    sets: 0,
+    activeDays: 0,
+    strength: 0,
+    runs: 0,
+    distance: 0,
+  });
+  assert.equal(firstDay.measurements, lastDay.measurements);
+});
+test('The weeks run from the first program’s first week to the last one’s, marking each start', () => {
+  const summary = progressSummary({}, '2026-11-18');
+  assert.equal(summary.weeks.length, 15);
+  assert.equal(summary.weeks[0].start, '2026-10-12');
+  assert.equal(summary.weeks.at(-1).end, '2027-01-24');
+  assert.deepEqual(
+    summary.weeks.flatMap((week, i) => (week.programStart ? [[i, week.programStart.id]] : [])),
+    [
+      [0, '2026-10-13'],
+      [5, '2026-11-16'],
+    ],
+  );
+  assert.equal(summary.thisWeek, summary.weeks[5]);
+  assert.deepEqual([summary.thisWeek.completed, summary.thisWeek.planned], [0, 6]);
+  assert.equal(summary.start, '2026-10-13');
+  assert.equal(summary.end, '2027-01-24');
+});
+test('A week holding the end of one program and the start of the next counts both', () => {
+  const moved = event('moved', 'schedule:2026-11-14', {
+    due: '2026-11-17',
+    originalDate: '2026-11-14',
+    lateMove: false,
+  });
+  const map = heads([moved, ...tickAll('2026-11-14', '2026-11-17'), ...tickAll('2026-11-16')]);
+  const summary = progressSummary(map, '2026-11-17');
+  assert.deepEqual([summary.weeks[4].completed, summary.weeks[4].planned], [0, 5]);
+  assert.deepEqual([summary.thisWeek.completed, summary.thisWeek.planned], [2, 7]);
+  assert.equal(summary.completed, 2);
+  assert.equal(summary.thisProgram.completed, 1);
+});
+test('Rest days elapsed count every program', () => {
+  // Oct 18 and 25, Nov 1, 8 and 15 in the first program, then Nov 22 in the second.
+  assert.equal(progressSummary({}, '2026-11-15').restDays, 5);
+  assert.equal(progressSummary({}, '2026-11-23').restDays, 6);
+});
 console.log(`\n${count} progress checks passed.`);

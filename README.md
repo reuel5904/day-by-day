@@ -27,7 +27,7 @@ Signed-out history and each account's cached history use separate browser storag
 - Individual completion checkboxes and Check all for exercises, sections, or the whole workout, with Undo. Sections with a single box have no Check all.
 - Choose Classic beep, Soft chime, Bell, or Digital pulse in the timer or Settings & backup; test the selected alarm and keep your choice in this browser.
 - Rest presets of 30, 45, 60, 90, and 120 seconds, plus custom minutes and seconds, pause/reset/add-time, and a repeating alarm with Stop alarm.
-- Progress shows completed workouts, checked sets, active training days, weekly completed/planned workouts, strength/running totals and rest days. A workout is complete as soon as every exercise set is ticked; warm-ups and cool-downs are optional, and Finish early saves a partial workout.
+- Progress shows completed workouts, checked sets, active training days and strength/running totals across every program, each with the current program's number beside it, plus weekly completed/planned workouts and rest days for every program. A workout is complete as soon as every exercise set is ticked; warm-ups and cool-downs are optional, and Finish early saves a partial workout.
 - Schedule, session notes, rescheduling, weekly completion, rest-aware streaks, exercise history, comparable personal bests, and running time/distance/pace.
 - Ticking a fixed-target set records its number (3×20s records 20 seconds per set; a run records its planned distance). Ranges and max tests ask for the number when ticked, and unticking removes only numbers that ticking recorded (ADR-0007).
 - Offline reopening after an online visit. Keep the page open and interact once for timer audio; locked-screen alerts are not guaranteed.
