@@ -1,0 +1,4 @@
+#!/bin/sh
+# CI's fast checks, before the push instead of after. Enabled by `npm install`
+# (the prepare script). Skip once with `git push --no-verify`.
+npm run lint && npm run check

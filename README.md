@@ -53,7 +53,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5174/day-by-day/`. Authored client code is in `web/src/`; `web/index.html` is the Vite entry point. Each program lives in `web/src/programs/<start date>/`: `program.ts` is its structured data and `roadmap.md` the roadmap it was converted from (ADR-0006). `web/src/exercises.ts` lists the exercise names every program uses, so an exercise keeps one history across programs. `CLAUDE.md` has the steps for loading a new program from a roadmap.
+Open `http://127.0.0.1:5174/day-by-day/`. Authored client code is in `web/src/`; `web/index.html` is the Vite entry point. Each program lives in `web/src/programs/<start date>/`: `program.ts` is its structured data and `roadmap.md` the roadmap it was converted from (ADR-0006). `web/src/exercises.ts` lists the exercise names every program uses, so an exercise keeps one history across programs. `CLAUDE.md` has the steps for loading a new program from a roadmap, and the PR, review and worktree workflow.
 
 ```sh
 npm run format:check   # npm run format fixes it
@@ -63,6 +63,8 @@ npm test
 npm run build
 ```
 
-The build writes the site to `dist/`, which is not committed. Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): it runs the checks above, builds, and deploys `dist/` to GitHub Pages, and nothing deploys if a check fails. The Pages source is set to **GitHub Actions**. The `/day-by-day/` asset base and service worker scope are configured for this project site.
+`npm ci` also turns on a git pre-push hook (`.githooks/pre-push`) that runs the lint and type checks before each push.
+
+The build writes the site to `dist/`, which is not committed. Changes reach `main` only through pull requests, squash merged. [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs the checks above and the build on every pull request; a merge to `main` runs them again and deploys `dist/` to GitHub Pages, and nothing deploys if a check fails. The Pages source is set to **GitHub Actions**. The `/day-by-day/` asset base and service worker scope are configured for this project site.
 
 The tests cover program data integrity, set completion, the workout clock, repeated weeks, the program summary, URLs, conflict preservation, streak rules, imported-history validation, account isolation, retry behavior, concurrent edits, malformed responses, and paginated downloads. `supabase/tests/training_history.sql` verifies real database role access inside a rolled-back transaction, including anonymous denial, cross-account isolation, and immutable retry semantics. See `GLOSSARY.md`, `docs/design.md`, and `docs/adr/` for product behavior and decisions.
