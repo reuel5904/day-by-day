@@ -38,6 +38,7 @@ const {
   workoutStatus,
   prescriptionLine,
   finishedProgramAt,
+  finishedPrograms,
   screenFromHash,
   hashForScreen,
   clockOf,
@@ -805,6 +806,14 @@ test('Today summarizes a program once its last day has passed', () => {
   assert.equal(finishedProgramAt('2027-01-25', {}).id, '2026-11-16');
   assert.equal(finishedProgramAt('2026-10-01', {}), null);
 });
+test('Progress lists every program whose last day has passed', () => {
+  const ids = (date) => finishedPrograms(date, {}).map((program) => program.id);
+  assert.deepEqual(ids('2026-11-15'), []);
+  // The earlier program is listed from the day Fundamentals starts, though Today never showed it.
+  assert.deepEqual(ids('2026-11-16'), ['2026-10-13']);
+  assert.deepEqual(ids('2027-01-24'), ['2026-10-13']);
+  assert.deepEqual(ids('2027-01-25'), ['2026-10-13', '2026-11-16']);
+});
 test('The URL keeps the screen and the chosen day', () => {
   assert.deepEqual(screenFromHash('#/workout/2026-10-22'), { view: 'today', date: '2026-10-22' });
   assert.deepEqual(screenFromHash('#/progress'), { view: 'progress' });
@@ -813,6 +822,12 @@ test('The URL keeps the screen and the chosen day', () => {
   assert.equal(hashForScreen({ view: 'today', date: '2026-10-22' }), '#/workout/2026-10-22');
   assert.equal(hashForScreen({ view: 'progress' }), '#/progress');
   assert.equal(hashForScreen({ view: 'today' }), '#/');
+});
+test('The URL keeps the program whose summary Progress is showing', () => {
+  const screen = { view: 'progress', program: '2026-10-13' };
+  assert.deepEqual(screenFromHash('#/progress/2026-10-13'), screen);
+  assert.equal(hashForScreen(screen), '#/progress/2026-10-13');
+  assert.deepEqual(screenFromHash('#/progress/oops'), { view: 'progress' });
 });
 test('A URL with an unknown screen or a malformed date opens Today', () => {
   for (const hash of ['#/workout/oops', '#/settings', '#'])

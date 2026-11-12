@@ -22,8 +22,8 @@ Signed-out history and each account's cached history use separate browser storag
 - Today opens with one row for the workout (title, date, week, sets done and reschedule), then its sets, so the first set is on a phone's first screen.
 - On phones, Today, Schedule and Progress tabs sit at the bottom with the rest timer floating above them.
 - Light and dark themes follow the device setting.
-- The screen and day live in the URL (`#/workout/2026-10-22`, `#/schedule`, `#/progress`), so a refresh keeps your place, the back button works, and a link opens a specific day.
-- After a program's last day, until the next one starts, Today shows its summary: workouts completed out of planned, best streak, personal bests, and the test-week results, with the final dead hang compared with Oct 16.
+- The screen and day live in the URL (`#/workout/2026-10-22`, `#/schedule`, `#/progress`, `#/progress/2026-10-13` for a finished program's summary), so a refresh keeps your place, the back button works, and a link opens a specific day.
+- After a program's last day, until the next one starts, Today shows its summary: workouts completed out of planned, best streak, personal bests, and the test-week results, with the final dead hang compared with Oct 16. Progress lists every finished program, and choosing one opens the same summary.
 - Individual completion checkboxes and Check all for exercises, sections, or the whole workout, with Undo. Sections with a single box have no Check all.
 - Choose Classic beep, Soft chime, Bell, or Digital pulse in the timer or Settings & backup; test the selected alarm and keep your choice in this browser.
 - Rest presets of 30, 45, 60, 90, and 120 seconds, plus custom minutes and seconds, pause/reset/add-time, and a repeating alarm with Stop alarm.

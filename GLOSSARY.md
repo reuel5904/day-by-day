@@ -134,7 +134,7 @@ A set that measures a best effort, such as a pull-up max or a max dead hang. An 
 _Avoid_: Assessment, benchmark set
 
 **Program summary**:
-What Today shows after a program's last day until the next program starts: workouts completed out of planned, best streak, personal bests and test results.
+How a finished program went: workouts completed out of planned, best streak, personal bests and test results. Today shows it after a program's last day until the next program starts, and Progress lists every finished program to open its summary.
 _Avoid_: Program report, recap
 
 **Progression suggestion**:

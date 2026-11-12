@@ -213,6 +213,9 @@ export function finishedProgramAt(date: string, map: Record<string, Event[]>) {
   const program = programAt(date, map);
   return program.end < date ? program : null;
 }
+// Every program whose last day has passed, oldest first.
+export const finishedPrograms = (date: string, map: Record<string, Event[]>) =>
+  programsIn(map).filter((p) => p.end < date);
 export const programDays = (program: Program, map: Record<string, Event[]>) =>
   calendar(map).filter((d) => d.program === program.id);
 // The section's wording without the "A. Name:" lead-in that its heading already shows. A
@@ -659,13 +662,26 @@ export function validateEvents(value: unknown): value is Event[] {
   );
 }
 export const isRunDay = (d: Day) => d.sections.some((s) => s.kind === 'run');
-// The screen lives after # in the URL: #/, #/workout/2026-10-22, #/schedule or #/progress.
-export type Screen = { view: 'today' | 'schedule' | 'progress'; date?: string };
+// The screen lives after # in the URL: #/, #/workout/2026-10-22, #/schedule, #/progress, or
+// #/progress/2026-10-13 for the summary of the program with that ID.
+export type Screen = {
+  view: 'today' | 'schedule' | 'progress';
+  date?: string;
+  program?: string;
+};
 export function screenFromHash(hash: string): Screen {
   const [, view, date] = hash.replace(/^#/, '').split('/');
+  const dated = /^\d{4}-\d{2}-\d{2}$/.test(date);
+  if (view === 'progress' && dated) return { view, program: date };
   if (view === 'schedule' || view === 'progress') return { view };
-  if (view === 'workout' && /^\d{4}-\d{2}-\d{2}$/.test(date)) return { view: 'today', date };
+  if (view === 'workout' && dated) return { view: 'today', date };
   return { view: 'today' };
 }
-export const hashForScreen = ({ view, date }: Screen) =>
-  view !== 'today' ? `#/${view}` : date ? `#/workout/${date}` : '#/';
+export const hashForScreen = ({ view, date, program }: Screen) =>
+  view === 'progress' && program
+    ? `#/progress/${program}`
+    : view !== 'today'
+      ? `#/${view}`
+      : date
+        ? `#/workout/${date}`
+        : '#/';
