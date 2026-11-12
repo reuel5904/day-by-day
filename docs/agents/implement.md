@@ -6,7 +6,7 @@
 
 1. `git status` lists only this ticket's files, on this ticket's branch. Anything else means another session shares the folder: stop and tell Reuel.
 2. Grep each term the change retires across `README.md`, `CLAUDE.md`, `CODING_STANDARDS.md`, `GLOSSARY.md` and `docs/`, and fix each hit: a ticket's Docs list often falls short.
-3. `git add -A`.
+3. `git add -A`, leaving nothing unstaged or untracked: the built-in commands pick their own diff, and a clean stage makes theirs the same as the diff command's.
 4. `git fetch`, then give the reviews (below) `git diff --cached --merge-base origin/main`.
 
 ## The review
@@ -17,15 +17,15 @@ Every review runs in a fresh sub-agent that sees only the diff, never the implem
 - **Built-in `/code-review` at `medium`** (bugs), on every PR.
 - **Built-in `/security-review`** (injection, auth holes, data exposure), on a PR that touches sign-in, sync (`web/src/auth-app.tsx`, `cloud-account.tsx`, `cloud-sync.ts`, `sync-store.ts`, `supabase.ts`), `supabase/migrations/` or row-level security.
 
-The built-in two each get a general-purpose sub-agent that runs the command through the Skill tool. Started by an agent, they run inline in its context, and they pick their own diff, so the sub-agent checks the files the command reviewed against the diff command's files and reports any it missed. `/code-review` may also ignore the level it's given: a run at another level stands, noted beside its findings.
+The built-in two each get a general-purpose sub-agent that runs the command through the Skill tool. `/code-review` may ignore the level it's given: a run at another level stands, noted beside its findings.
 
-The implementing agent then lists every finding in chat, one line each, as **fix**, **skip** (with a reason) or **Reuel's call**, with a finding two reviews share merged into one line. A finding that needs a rare chain of events is a skip unless getting it wrong loses saved results or history, or opens a security hole. Only the fix ones are fixed, without waiting: the list comes back with the merge question, where Reuel can overturn any line. Reuel's calls are numbered questions, each with a recommended answer. Nothing is committed until Reuel answers, and a call Reuel says to fix counts as a fix.
+Review results go in the chat before the merge question, never on the PR. The implementing agent lists every finding, one line each, as **fix**, **skip** (with a reason) or **Reuel's call**, with a finding two reviews share merged into one line. A finding that needs a rare chain of events is a skip unless getting it wrong loses saved results or history, or opens a security hole. Only the fix ones are fixed, without waiting: the list comes back with the merge question, where Reuel can overturn any line. Reuel's calls are numbered questions, each with a recommended answer. Nothing is committed until Reuel answers, and a call Reuel says to fix counts as a fix.
 
 When there are fixes, one more round, and no third: commit what the reviews saw, make the fixes, and before the fix commit give `git diff HEAD` (the fixes alone) to one general-purpose sub-agent, briefed in plain words to look for bugs, and for security holes if `/security-review` ran. Not the commands: they pick their own diff, which takes in the whole branch again, and a second full review mostly finds what the first could have.
 
 ## Fix commits
 
-A fix commit after the first names where the fix came from: a review, Reuel or CI, such as "Reuel's calls on PR #14". Its body lists each finding with its review, as its line in chat reads (The review, above), with Reuel's answer to each call. Review results go in the chat, never on the PR (`CLAUDE.md`, Workflow skills), so these commits are the review's only trace on GitHub.
+A fix commit after the first names where the fix came from: a review, Reuel or CI, such as "Reuel's calls on PR #14". Its body lists each finding with its review, as its line in chat reads (The review, above), with Reuel's answer to each call. Review results stay off the PR (The review, above), so these commits are the review's only trace on GitHub.
 
 ## After merge
 
