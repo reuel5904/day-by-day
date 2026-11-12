@@ -30,6 +30,7 @@ const {
   resultEntries,
   completionChanges,
   completionKey,
+  currentVariation,
   isSetComplete,
   setKey,
   untickChanges,
@@ -311,6 +312,34 @@ test('Ticking a fixed-target set records that target as its result', () => {
   assert.equal(result.unit, 'sec');
   assert.equal(result.variation, 'tucked');
   assert.equal(result.asPrescribed, true);
+});
+const advancedTo = (name, variation) =>
+  heads([event('advance-' + name, `stage:${name}`, { variation, previous: '' })]);
+test('An exercise without a progression rule shows its written variation, whatever was stored', () => {
+  const hold = exerciseOf('2026-10-13', 'b2e0');
+  assert.equal(currentVariation(advancedTo('Hollow Hold', 'one-leg'), hold), 'tucked');
+});
+test('Ticking a fixed-target set records the written variation, whatever was stored', () => {
+  const hold = exerciseOf('2026-10-13', 'b2e0');
+  const key = setKey('2026-10-13', hold, 0);
+  const stored = advancedTo('Hollow Hold', 'one-leg');
+  const events = changeEvents(
+    completionChanges(stored, [{ key, exercise: hold }], '2026-10-13', '2026-10-13'),
+  );
+  assert.equal(resultEntries(heads(events))[0].variation, 'tucked');
+});
+test('An exercise with a progression rule shows and records its stored current variation', () => {
+  const pushUps = exerciseOf('2026-11-02', 'b2e0');
+  assert.equal(currentVariation({}, pushUps), 'Standard');
+  const stored = advancedTo('Push-Ups', 'Decline');
+  assert.equal(currentVariation(stored, pushUps), 'Decline');
+  // A ticked fixed target records it too. No written exercise pairs a rule with a fixed target.
+  const fixed = { ...pushUps, target: '12' };
+  const key = setKey('2026-11-02', fixed, 0);
+  const events = changeEvents(
+    completionChanges(stored, [{ key, exercise: fixed }], '2026-11-02', '2026-11-02'),
+  );
+  assert.equal(resultEntries(heads(events))[0].variation, 'Decline');
 });
 test('Ticking a range or a max test records completion without a number', () => {
   for (const [date, id] of [

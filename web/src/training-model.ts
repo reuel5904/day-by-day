@@ -237,8 +237,10 @@ export function isSetComplete(map: Record<string, Event[]>, key: string): boolea
 }
 export const fixedTarget = (e: Exercise) =>
   e.unit !== 'check' && /^\d+(\.\d+)?$/.test(e.target) ? Number(e.target) : null;
+// Only an exercise with a progression rule follows a confirmed advancement; any other keeps the
+// variation its program writes, so one exercise can fill two slots at different variations.
 export const currentVariation = (map: Record<string, Event[]>, e: Exercise): string =>
-  latest(map, `stage:${e.name}`)?.variation || e.variation;
+  (e.progression && latest(map, `stage:${e.name}`)?.variation) || e.variation;
 // Ticking a fixed-target set confirms its prescribed number (ADR-0007).
 export function prescribedResult(
   map: Record<string, Event[]>,

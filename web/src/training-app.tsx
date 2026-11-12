@@ -2488,7 +2488,7 @@ function ExerciseLogger({
   onToggle: (i: number) => void;
   onCheckAll: () => void;
 }) {
-  const defaultVariation = latest(map, `stage:${e.name}`)?.variation || e.variation;
+  const defaultVariation = currentVariation(map, e);
   const firstRecorded = Array.from({ length: e.count }, (_, i) =>
     latest(map, setKey(day.date, e, i)),
   ).find((r) => r && !r.skipped);
