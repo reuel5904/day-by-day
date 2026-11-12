@@ -1,5 +1,7 @@
 # day-by-day
 
+Reuel is the only developer and the app's only user.
+
 ## Read first
 
 1. `GLOSSARY.md`, the training vocabulary. Use its terms in conversation, code, and file names.
@@ -8,15 +10,12 @@
 
 ## Workflow
 
-Reuel is the only developer and the app's only user.
-
 - **Every change reaches `main` through a PR**, one issue per PR, squash merged. A ruleset on GitHub refuses a direct push.
-- **Each branch gets its own worktree**, set up with `npm ci`. Branch names start `feat/` (refactors too), `fix/` or `chore/`. **PR titles** are Conventional Commits scoped to one of `today`, `schedule`, `progress`, `timer`, `sync`, `program`, `docs`, `ci` or `deps`, such as `feat(schedule): repeat a week`.
+- **Each branch gets its own worktree**, set up with `npm ci`. Branches are short-lived, and their names start `feat/` (refactors too), `fix/` or `chore/`. **PR titles** are Conventional Commits scoped to one of `today`, `schedule`, `progress`, `timer`, `sync`, `program`, `docs`, `ci` or `deps`, such as `feat(schedule): repeat a week`.
 - A PR's CI runs the checks in `.github/workflows/deploy.yml`, and a merge deploys to GitHub Pages: **a merge is a release**.
-- Every PR, before it merges, runs **the review** (`docs/agents/implement.md`, The review), whether `/implement` made it or not.
-- **Before a merge**, check that CI passed (`gh pr checks <pr>`) and every box on the issue the PR closes is ticked. Tell Reuel about any conflict first, and merge only once Reuel says to, with `gh pr merge <pr> --squash --delete-branch`.
+- **Before a merge**, check that CI passed (`gh pr checks <pr>`), every box on the issue the PR closes is ticked, and nothing in the PR's title, body or commits credits Claude. Tell Reuel about any conflict first, and merge only once Reuel says to, with `gh pr merge <pr> --squash --delete-branch`.
 - **Before grilling an issue**, read `docs/agents/grilling.md`.
-- **Before staging for the review, making a fix commit, or running an after-merge step**, read `docs/agents/implement.md`.
+- Every PR runs **the review** (`docs/agents/implement.md`, The review) before it merges, whether `/implement` made it or not. **Before staging for the review, making a fix commit, or running an after-merge step**, read `docs/agents/implement.md`.
 - **Before writing a ticket wrap-up**, read `docs/agents/wrap-up.md`.
 - **Before writing a PR body**, read `docs/agents/pr-bodies.md`.
 
