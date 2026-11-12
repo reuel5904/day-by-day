@@ -166,12 +166,19 @@ function runProgram(written: Day[], repeats: Repeat[]): Day[] {
 }
 function buildSchedule(map: Record<string, Event[]>) {
   const repeats = repeatsIn(map);
-  const days = programData.flatMap((p) =>
-    runProgram(
+  // Results are keyed by date, so a date holds one workout: a program whose repeats would carry
+  // it into the next program stops where that one starts.
+  const cutShort = new Set<string>();
+  const days = programData.flatMap((p, i) => {
+    const run = runProgram(
       writtenDays.filter((d) => d.program === p.id),
       repeats.filter((r) => r.program === p.id),
-    ),
-  );
+    );
+    const next = programData[i + 1]?.weeks[0].days[0].date;
+    if (!next || run.at(-1)!.date < next) return run;
+    cutShort.add(p.id);
+    return run.filter((d) => d.date < next);
+  });
   const programs: Program[] = programData.map(({ weeks: _weeks, ...p }) => {
     const own = days.filter((d) => d.program === p.id);
     return {
@@ -181,7 +188,7 @@ function buildSchedule(map: Record<string, Event[]>) {
       weeks: [...new Set(own.map((d) => d.code))],
     };
   });
-  return { days, programs };
+  return { days, programs, cutShort };
 }
 const schedules = new WeakMap<object, ReturnType<typeof buildSchedule>>();
 function scheduleOf(map: Record<string, Event[]>) {
@@ -237,8 +244,10 @@ export function isSetComplete(map: Record<string, Event[]>, key: string): boolea
 }
 export const fixedTarget = (e: Exercise) =>
   e.unit !== 'check' && /^\d+(\.\d+)?$/.test(e.target) ? Number(e.target) : null;
+// Only an exercise with a progression rule follows a confirmed advancement; any other keeps the
+// variation its program writes, so one exercise can fill two slots at different variations.
 export const currentVariation = (map: Record<string, Event[]>, e: Exercise): string =>
-  latest(map, `stage:${e.name}`)?.variation || e.variation;
+  (e.progression && latest(map, `stage:${e.name}`)?.variation) || e.variation;
 // Ticking a fixed-target set confirms its prescribed number (ADR-0007).
 export function prescribedResult(
   map: Record<string, Event[]>,
@@ -381,10 +390,10 @@ export function previewRepeat(map: Record<string, Event[]>, repeat: Repeat, toda
     data: repeat,
     at: '',
   };
-  const programs = programsIn({ ...map, [event.entity]: [event] });
+  const { programs, cutShort } = scheduleOf({ ...map, [event.entity]: [event] });
   const index = programs.findIndex((p) => p.id === repeat.program);
   const next = programs[index + 1];
-  if (next && programs[index].end >= next.start)
+  if (next && cutShort.has(repeat.program))
     return { problem: `That would run into ${next.title}, which starts ${dateLabel(next.start)}.` };
   return { end: programs[index].end };
 }
