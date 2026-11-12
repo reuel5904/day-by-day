@@ -275,13 +275,13 @@ export default function TrainingApp({ user }: { user: User }) {
   const days = calendar(map);
   const chosen = screen.date && days.some((d) => d.date === screen.date) ? screen.date : null;
   const selected = chosen ?? firstToday(days, today);
-  const pastPrograms = finishedPrograms(today, map);
+  const programsFinished = finishedPrograms(today, map);
   // The program whose summary is showing: on Today once it has ended, or one chosen on Progress.
-  const finished =
+  const summarized =
     view === 'today' && !chosen
       ? finishedProgramAt(today, map)
       : view === 'progress'
-        ? (pastPrograms.find((p) => p.id === screen.program) ?? null)
+        ? (programsFinished.find((p) => p.id === screen.program) ?? null)
         : null;
   const day = days.find((d) => d.date === selected)!;
   const status = workoutStatus(day, map, today);
@@ -1133,7 +1133,7 @@ export default function TrainingApp({ user }: { user: User }) {
             <span className="breadcrumb">
               YOUR TRAINING <ChevronRight size={13} />
               <b>
-                {finished
+                {summarized
                   ? 'Program summary'
                   : view === 'today'
                     ? due(day) === today
@@ -1189,15 +1189,15 @@ export default function TrainingApp({ user }: { user: User }) {
               <ArrowRight size={16} />
             </button>
           )}
-          {finished && (
+          {summarized && (
             <ProgramSummary
               map={map}
-              program={finished}
+              program={summarized}
               today={today}
               onOpen={(next) => go({ view: next })}
             />
           )}
-          {view === 'today' && !finished && (
+          {view === 'today' && !summarized && (
             <>
               <section className="week-strip" aria-label="Week navigation">
                 <button
@@ -1894,7 +1894,7 @@ export default function TrainingApp({ user }: { user: User }) {
                 ))}
             </>
           )}
-          {view === 'progress' && !finished && (
+          {view === 'progress' && !summarized && (
             <>
               <div className="page-heading">
                 <div>
@@ -2004,13 +2004,13 @@ export default function TrainingApp({ user }: { user: User }) {
                 ))}
                 {!recentWorkouts.length && <p className="empty-line">No workouts yet.</p>}
               </section>
-              {pastPrograms.length > 0 && (
+              {programsFinished.length > 0 && (
                 <section className="recent-history">
                   <div className="section-heading">
                     <h2>Finished programs</h2>
                     <Flag size={20} />
                   </div>
-                  {[...pastPrograms].reverse().map((p) => (
+                  {[...programsFinished].reverse().map((p) => (
                     <button
                       className="history-row"
                       key={p.id}
@@ -2036,7 +2036,7 @@ export default function TrainingApp({ user }: { user: User }) {
           </footer>
         </main>
       </div>
-      {view === 'today' && !finished && (
+      {view === 'today' && !summarized && (
         <div className={`mobile-timer ${timerOpen ? 'expanded' : ''}`}>
           <button
             className="mobile-timer-toggle"

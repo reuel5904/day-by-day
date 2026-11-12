@@ -670,11 +670,12 @@ export type Screen = {
   program?: string;
 };
 export function screenFromHash(hash: string): Screen {
-  const [, view, date] = hash.replace(/^#/, '').split('/');
-  const dated = /^\d{4}-\d{2}-\d{2}$/.test(date);
-  if (view === 'progress' && dated) return { view, program: date };
+  // A workout's date or a program's ID, which is its start date.
+  const [, view, id] = hash.replace(/^#/, '').split('/');
+  const isDate = /^\d{4}-\d{2}-\d{2}$/.test(id);
+  if (view === 'progress' && isDate) return { view, program: id };
   if (view === 'schedule' || view === 'progress') return { view };
-  if (view === 'workout' && dated) return { view: 'today', date };
+  if (view === 'workout' && isDate) return { view: 'today', date: id };
   return { view: 'today' };
 }
 export const hashForScreen = ({ view, date, program }: Screen) =>
