@@ -443,6 +443,15 @@ main {
   font-size: 13px;
   margin-top: 8px;
 }
+.page-heading.up-next {
+  margin: 44px 0 20px;
+}
+.page-heading.up-next h2 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+  margin-top: 9px;
+}
 .week-strip {
   display: flex;
   background: var(--surface);
