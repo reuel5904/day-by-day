@@ -990,9 +990,15 @@ export default function TrainingApp({ user }: { user: User }) {
       (b.status.actualDate || b.day.date).localeCompare(a.status.actualDate || a.day.date),
     )
     .slice(0, 10);
-  // The Schedule starts at the running program, or at an earlier one whose day is open, and
-  // lists every program after it.
-  const scheduled = program.start <= currentProgram.start ? program : currentProgram;
+  // The Schedule leads with the running program, then lists the ones after it, then the ones
+  // before it, newest first.
+  const scheduled = currentProgram;
+  const scheduledPrograms = [
+    ...programsIn(map).filter((p) => p.start >= scheduled.start),
+    ...programsIn(map)
+      .filter((p) => p.start < scheduled.start)
+      .reverse(),
+  ];
   const totalComplete = programDays(scheduled, map).filter(
     (d) => d.sections.length && isFinished(workoutStatus(d, map, today)),
   ).length;
@@ -1751,8 +1757,7 @@ export default function TrainingApp({ user }: { user: User }) {
                   </p>
                 </div>
               </div>
-              {programsIn(map)
-                .filter((p) => p.start >= scheduled.start)
+              {scheduledPrograms
                 .map((p) => ({ p, own: programDays(p, map) }))
                 .map(({ p, own }) => (
                   <Fragment key={p.id}>
@@ -1760,7 +1765,11 @@ export default function TrainingApp({ user }: { user: User }) {
                       <div className="page-heading up-next">
                         <div>
                           <span className="eyebrow">
-                            {p.start > today ? 'Up next · ' : ''}
+                            {p.start < scheduled.start
+                              ? 'Earlier · '
+                              : p.start > today
+                                ? 'Up next · '
+                                : ''}
                             {dateLabel(p.start, {
                               month: 'short',
                               day: 'numeric',
@@ -1855,7 +1864,7 @@ export default function TrainingApp({ user }: { user: User }) {
                                   <RotateCcw size={15} />
                                 </button>
                               )}
-                              {list[0].date <= today && (
+                              {p.start >= scheduled.start && list[0].date <= today && (
                                 <button
                                   className="text-link"
                                   onClick={() => {
