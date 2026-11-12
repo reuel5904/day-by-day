@@ -524,7 +524,7 @@ Tests come first while you're fresh. Everything else drops to 2 sets. No 4-set n
 - Warm-up: arm circles, 15 bodyweight squats, scapular pull-ups 2×8
 - **Strict Pull-Ups: 1× max from a dead hang. Log it.** Rest 2 min
 - **Longest Negative Pull-Up: 1 rep, as slow as you can. Log the seconds.** Rest 2 min
-- B. Rows (feet further forward): 2×8 · rest 90s
+- B. Superset ×2: Rows (feet further forward) 8 → Push-Ups 16 · rest 90s
 - C. Superset ×2: Pike Push-Ups (feet raised) 6 → Tempo Bulgarian Split Squats 10/leg (3s down) · rest 90s
 - D. Glute Bridge (Single-Leg): 2×10/leg · rest 60s
 

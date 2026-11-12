@@ -344,6 +344,7 @@ test('F10 puts its tests first and drops everything else to 2 sets', () => {
     'Pull-Ups [Standard] 1×max · rest 120 · test',
     'Negative Pull-Ups [Standard] 1×maxs · rest 120 · test',
     rows,
+    'Push-Ups [Standard] 2×16 · rest 90',
     ...lower,
   ]);
   assert.deepEqual(written('2027-01-19'), runCore);

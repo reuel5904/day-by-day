@@ -4308,8 +4308,8 @@ export default {
             },
             {
               id: 'b3',
-              kind: 'exercise',
-              text: 'B. Rows (feet further forward): 2×8 · rest 90s',
+              kind: 'superset',
+              text: 'B. Superset ×2: Rows (feet further forward) 8 → Push-Ups 16 · rest 90s',
               rest: 90,
               exercises: [
                 {
@@ -4320,6 +4320,7 @@ export default {
                   unit: 'reps',
                   target: '8',
                 },
+                { id: 'b3e1', name: 'Push-Ups', count: 2, unit: 'reps', target: '16' },
               ],
             },
             {
