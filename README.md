@@ -53,7 +53,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5174/day-by-day/`. Authored client code is in `web/src/`; `web/index.html` is the Vite entry point. Each program lives in `web/src/programs/<start date>/`: `program.ts` is its structured data and `roadmap.md` the roadmap it was converted from (ADR-0006). `web/src/exercises.ts` lists the exercise names every program uses, so an exercise keeps one history across programs. `CLAUDE.md` has the steps for loading a new program from a roadmap, and the PR workflow.
+Open `http://127.0.0.1:5174/day-by-day/`. Authored client code is in `web/src/`; `web/index.html` is the Vite entry point. Each program lives in `web/src/programs/<start date>/`: `program.ts` is its structured data and `roadmap.md` the roadmap it was converted from (ADR-0006). `web/src/exercises.ts` lists the exercise names every program uses, so an exercise keeps one history across programs. `CLAUDE.md` has the steps for loading a new program from a roadmap, and the PR workflow; `docs/agents/worktrees.md` has the worktree steps.
 
 ```sh
 npm run format:check   # npm run format fixes it
