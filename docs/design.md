@@ -59,7 +59,7 @@ Sources: [styles.css](https://github.com/reuel5904/day-by-day/blob/main/styles.c
 - Save workout entries locally immediately, support offline logging, and synchronize after reconnection. Show save/sync status and preserve conflicting edits until explicitly resolved.
 - Move individual workouts only. Preserve original date, revised scheduled date, and actual training date. Moving an already missed workout does not erase its earlier missed deadline.
 - Repeat a whole week from the Schedule. It runs again from a chosen date with every later week following; earlier workouts and results stay as they are (ADR-0009).
-- Keep the existing program (October 13–November 15, 2026, since it was ended at W2), with individual rescheduling. Reusable programs and a general plan builder remain outside this version.
+- Keep the existing programs (October 13–November 15, 2026, ended at W2, then Fundamentals from November 16), with individual rescheduling. Reusable programs and a general plan builder remain outside this version.
 - Proceed with the working design without additional interview or design approval questions.
 
 ## Implementation

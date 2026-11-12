@@ -420,7 +420,8 @@ export default {
             {
               id: 'b5',
               kind: 'exercise',
-              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it.',
+              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it. Rest 2 min',
+              rest: 120,
               exercises: [{ id: 'b5e0', name: 'Pull-Ups', count: 1, unit: 'reps', test: true }],
             },
             {
@@ -876,7 +877,8 @@ export default {
             {
               id: 'b5',
               kind: 'exercise',
-              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it.',
+              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it. Rest 2 min',
+              rest: 120,
               exercises: [{ id: 'b5e0', name: 'Pull-Ups', count: 1, unit: 'reps', test: true }],
             },
             {
@@ -1332,7 +1334,8 @@ export default {
             {
               id: 'b5',
               kind: 'exercise',
-              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it.',
+              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it. Rest 2 min',
+              rest: 120,
               exercises: [{ id: 'b5e0', name: 'Pull-Ups', count: 1, unit: 'reps', test: true }],
             },
             {
@@ -1790,7 +1793,8 @@ export default {
             {
               id: 'b5',
               kind: 'exercise',
-              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it.',
+              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it. Rest 2 min',
+              rest: 120,
               exercises: [{ id: 'b5e0', name: 'Pull-Ups', count: 1, unit: 'reps', test: true }],
             },
             {
@@ -2252,7 +2256,8 @@ export default {
             {
               id: 'b5',
               kind: 'exercise',
-              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it.',
+              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it. Rest 2 min',
+              rest: 120,
               exercises: [{ id: 'b5e0', name: 'Pull-Ups', count: 1, unit: 'reps', test: true }],
             },
             {
@@ -2713,7 +2718,8 @@ export default {
             {
               id: 'b5',
               kind: 'exercise',
-              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it.',
+              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it. Rest 2 min',
+              rest: 120,
               exercises: [{ id: 'b5e0', name: 'Pull-Ups', count: 1, unit: 'reps', test: true }],
             },
             {
@@ -3217,7 +3223,8 @@ export default {
             {
               id: 'b5',
               kind: 'exercise',
-              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it.',
+              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it. Rest 2 min',
+              rest: 120,
               exercises: [{ id: 'b5e0', name: 'Pull-Ups', count: 1, unit: 'reps', test: true }],
             },
             {
@@ -3721,7 +3728,8 @@ export default {
             {
               id: 'b5',
               kind: 'exercise',
-              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it.',
+              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it. Rest 2 min',
+              rest: 120,
               exercises: [{ id: 'b5e0', name: 'Pull-Ups', count: 1, unit: 'reps', test: true }],
             },
             {
@@ -4225,7 +4233,8 @@ export default {
             {
               id: 'b5',
               kind: 'exercise',
-              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it.',
+              text: 'Strict Pull-Ups: 1× max from a dead hang. Log it. Rest 2 min',
+              rest: 120,
               exercises: [{ id: 'b5e0', name: 'Pull-Ups', count: 1, unit: 'reps', test: true }],
             },
             {

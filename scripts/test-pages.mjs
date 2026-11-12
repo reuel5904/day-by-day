@@ -171,7 +171,25 @@ const written = (date) =>
         ].join(''),
       ),
     );
-const fridayTests = ['Pull-Ups [Standard] 1×max · test', 'Dead Hang [Standard] 1×maxs · test'];
+const fridayTests = [
+  'Pull-Ups [Standard] 1×max · rest 120 · test',
+  'Dead Hang [Standard] 1×maxs · test',
+];
+test('Hollow Hold and Side Plank step up in the weeks between the sampled ones', () => {
+  const holds = (date) => written(date).filter((line) => /^(Hollow Hold|Side Plank)/.test(line));
+  assert.deepEqual(holds('2026-11-24'), [
+    'Hollow Hold [one-leg] 3×20s/side · rest 45',
+    'Side Plank [Standard] 2×55s/side · rest 45',
+  ]);
+  assert.deepEqual(holds('2026-12-01'), [
+    'Hollow Hold [one-leg] 3×25s/side · rest 45',
+    'Side Plank [Standard] 2×60s/side · rest 45',
+  ]);
+  assert.deepEqual(holds('2026-12-08'), [
+    'Hollow Hold [one-leg] 3×30s/side · rest 45',
+    'Side Plank [raised foot] 2×30s/side · rest 45',
+  ]);
+});
 test('F1 starts every exercise at its written number', () => {
   const lower = [
     'Pike Push-Ups [Standard] 3×8 · rest 90',
@@ -983,6 +1001,19 @@ test('A repeat that would run the earlier program into Fundamentals is refused',
     previewRepeat({}, w1, '2026-11-07').problem,
     'That would run into Fundamentals, which starts Nov 16.',
   );
+});
+test('A repeat already in history cannot put two workouts on one date', () => {
+  const map = heads([
+    event('old-repeat', 'repeat:2026-11-09', {
+      program: '2026-10-13',
+      week: 'W1',
+      start: '2026-11-09',
+    }),
+  ]);
+  const dates = calendar(map).map((d) => d.date);
+  assert.equal(new Set(dates).size, dates.length);
+  assert.equal(calendar(map).find((d) => d.date === '2026-11-16').program, '2026-11-16');
+  assert.equal(calendar(map).find((d) => d.date === '2026-11-15').code, 'W1 (repeat)');
 });
 test('A tick taken back or an empty clock does not hold a date', () => {
   const map = heads([

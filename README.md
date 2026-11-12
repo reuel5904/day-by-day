@@ -2,7 +2,7 @@
 
 A personal calisthenics and running planner, published at **https://reuel5904.github.io/day-by-day/**.
 
-Follow a dated training program (the current one runs October 13–November 15, 2026), tick off sets as you go, time each workout, rest with an audible timer, and track consistency and measured performance.
+Follow a dated training program (the current one, Fundamentals, runs November 16, 2026–January 24, 2027), tick off sets as you go, time each workout, rest with an audible timer, and track consistency and measured performance.
 
 ## GitHub Pages version
 

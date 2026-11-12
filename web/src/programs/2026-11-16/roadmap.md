@@ -49,7 +49,7 @@ Fixed numbers. Hit the written number on every set, even when it feels easy.
 - B. Superset ×3: Rows 8 → Push-Ups 16 · rest 90s
 - C. Superset ×3: Pike Push-Ups 8 → Bulgarian Split Squats 12/leg · rest 90s
 - D. Glute Bridge (Single-Leg): 3×8/leg · rest 60s
-- **Strict Pull-Ups: 1× max from a dead hang. Log it.**
+- **Strict Pull-Ups: 1× max from a dead hang. Log it.** Rest 2 min
 - **Max Dead Hang: 1× max. Log it.**
 
 **Sat Nov 21 · Long Run**
@@ -106,7 +106,7 @@ One step up on everything. Hollow Hold moves to one-leg.
 - B. Superset ×3: Rows 9 → Push-Ups 17 · rest 90s
 - C. Superset ×3: Pike Push-Ups 9 → Bulgarian Split Squats 13/leg · rest 90s
 - D. Glute Bridge (Single-Leg): 3×9/leg · rest 60s
-- **Strict Pull-Ups: 1× max from a dead hang. Log it.**
+- **Strict Pull-Ups: 1× max from a dead hang. Log it.** Rest 2 min
 - **Max Dead Hang: 1× max. Log it.**
 
 **Sat Nov 28 · Long Run**
@@ -163,7 +163,7 @@ One step up on everything.
 - B. Superset ×3: Rows 10 → Push-Ups 18 · rest 90s
 - C. Superset ×3: Pike Push-Ups 10 → Bulgarian Split Squats 14/leg · rest 90s
 - D. Glute Bridge (Single-Leg): 3×10/leg · rest 60s
-- **Strict Pull-Ups: 1× max from a dead hang. Log it.**
+- **Strict Pull-Ups: 1× max from a dead hang. Log it.** Rest 2 min
 - **Max Dead Hang: 1× max. Log it.**
 
 **Sat Dec 5 · Long Run**
@@ -220,7 +220,7 @@ One step up on everything. Side Plank moves to a raised foot and restarts at 30s
 - B. Superset ×3: Rows 11 → Push-Ups 19 · rest 90s
 - C. Superset ×3: Pike Push-Ups 11 → Bulgarian Split Squats 15/leg · rest 90s
 - D. Glute Bridge (Single-Leg): 3×11/leg · rest 60s
-- **Strict Pull-Ups: 1× max from a dead hang. Log it.**
+- **Strict Pull-Ups: 1× max from a dead hang. Log it.** Rest 2 min
 - **Max Dead Hang: 1× max. Log it.**
 
 **Sat Dec 12 · Long Run**
@@ -277,7 +277,7 @@ Bulgarians become Tempo Bulgarians (3s down) and Hollow Hold goes low straight-l
 - B. Superset ×3: Rows 12 → Push-Ups 20 · rest 90s
 - C. Superset ×3: Pike Push-Ups 12 → Tempo Bulgarian Split Squats 10/leg (3s down) · rest 90s
 - D. Glute Bridge (Single-Leg): 3×12/leg · rest 60s
-- **Strict Pull-Ups: 1× max from a dead hang. Log it.**
+- **Strict Pull-Ups: 1× max from a dead hang. Log it.** Rest 2 min
 - **Max Dead Hang: 1× max. Log it.**
 
 **Sat Dec 19 · Long Run**
@@ -334,7 +334,7 @@ Bulgarians become Tempo Bulgarians (3s down) and Hollow Hold goes low straight-l
 - B. Superset ×2: Rows 10 → Push-Ups 16 · rest 90s
 - C. Superset ×2: Pike Push-Ups 8 → Tempo Bulgarian Split Squats 8/leg (3s down) · rest 90s
 - D. Glute Bridge (Single-Leg): 2×8/leg · rest 60s
-- **Strict Pull-Ups: 1× max from a dead hang. Log it.**
+- **Strict Pull-Ups: 1× max from a dead hang. Log it.** Rest 2 min
 - **Max Dead Hang: 1× max. Log it.**
 
 **Sat Dec 26 · Long Run**
@@ -391,7 +391,7 @@ Back to full sets. Rows move feet further forward and Pike Push-Ups go feet rais
 - B. Superset ×3: Rows (feet further forward) 8 → Push-Ups 21 · rest 90s
 - C. Superset ×3: Pike Push-Ups (feet raised) 6 → Tempo Bulgarian Split Squats 11/leg (3s down) · rest 90s
 - D. Glute Bridge (Single-Leg): 3×13/leg · rest 60s
-- **Strict Pull-Ups: 1× max from a dead hang. Log it.**
+- **Strict Pull-Ups: 1× max from a dead hang. Log it.** Rest 2 min
 - **Max Dead Hang: 1× max. Log it.**
 
 **Sat Jan 2 · Long Run**
@@ -448,7 +448,7 @@ One step up on everything. Saturday is the 4 mile run.
 - B. Superset ×3: Rows (feet further forward) 9 → Push-Ups 22 · rest 90s
 - C. Superset ×3: Pike Push-Ups (feet raised) 7 → Tempo Bulgarian Split Squats 12/leg (3s down) · rest 90s
 - D. Glute Bridge (Single-Leg): 3×14/leg · rest 60s
-- **Strict Pull-Ups: 1× max from a dead hang. Log it.**
+- **Strict Pull-Ups: 1× max from a dead hang. Log it.** Rest 2 min
 - **Max Dead Hang: 1× max. Log it.**
 
 **Sat Jan 9 · Long Run**
@@ -505,7 +505,7 @@ The highest numbers of the program. Negatives go to 5 reps.
 - B. Superset ×3: Rows (feet further forward) 10 → Push-Ups 23 · rest 90s
 - C. Superset ×3: Pike Push-Ups (feet raised) 8 → Tempo Bulgarian Split Squats 13/leg (3s down) · rest 90s
 - D. Glute Bridge (Single-Leg): 3×15/leg · rest 60s
-- **Strict Pull-Ups: 1× max from a dead hang. Log it.**
+- **Strict Pull-Ups: 1× max from a dead hang. Log it.** Rest 2 min
 - **Max Dead Hang: 1× max. Log it.**
 
 **Sat Jan 16 · Long Run**
