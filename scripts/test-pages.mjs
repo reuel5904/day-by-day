@@ -125,11 +125,12 @@ test('Workouts up to Oct 22 keep the IDs, set counts and units their history use
     assert.equal(actual, expected, date);
   }
 });
-test('The program keeps all 90 dated days with their written prescriptions', () => {
-  assert.equal(days.length, 90);
+test('The program keeps all 34 dated days with their written prescriptions', () => {
+  assert.equal(days.length, 34);
   assert.equal(days[0].date, '2026-10-13');
-  assert.equal(days.at(-1).date, '2027-01-10');
-  assert.equal(new Set(days.map((d) => d.date)).size, 90);
+  assert.equal(days.at(-1).date, '2026-11-15');
+  assert.equal(new Set(days.map((d) => d.date)).size, 34);
+  assert.equal(programsIn({})[0].weeks.join(), 'R1,R2,R3,W1,W2');
   for (const d of days) for (const s of d.sections) assert.ok(s.text && s.exercises.length, d.date);
 });
 test('Every exercise is on the shared exercise list', () => {
@@ -149,50 +150,26 @@ test('Keep negative tempo separate from rep count', () => {
   assert.equal(e.target, '2');
   assert.equal(e.tempo, '4s');
 });
-test('Split a max pull-up test from two easy back-off sets', () => {
-  const s = sectionWith('TEST: Pull-Ups, 1 max set.');
-  assert.equal(s.exercises.length, 2);
-  assert.equal(s.exercises[0].count, 1);
-  assert.equal(s.exercises[1].count, 2);
-  assert.equal(s.exercises[1].target, '3');
-});
-test('Final dead hang test is one hold, not three guessed sets', () => {
-  const [e] = sectionWith('TEST: Max Dead Hang.').exercises;
+test('A max dead hang is one hold, not three guessed sets', () => {
+  const [e] = sectionWith('Max Dead Hang: 1× max.').exercises;
   assert.equal(e.count, 1);
   assert.equal(e.name, 'Dead Hang');
   assert.equal(e.unit, 'sec');
 });
-test('Do not confuse strides with distance or a two-leg variation with unilateral work', () => {
-  const run = sectionWith('Run: 3 mi easy, then Strides 4×15s');
-  assert.equal(run.exercises[0].unit, 'run');
-  assert.equal(run.exercises[1].unit, 'sec');
-  assert.equal(run.exercises[1].count, 4);
+test('Do not confuse a two-leg variation with unilateral work', () => {
   const bridge = sectionWith(
-    'D. Superset ×3: Pike chain 6-12 [Floor Pike] → Glute Bridge chain [two-leg',
+    'D. Superset ×3: Pike chain 6-12 [Floor Pike] → Glute Bridge chain 15-20 [two-leg]',
   );
   assert.equal(bridge.exercises[1].sides, false);
 });
-test('Every pull-up and chin-up day that offers 4×6-8 lets you choose it', () => {
-  const offers = days.flatMap((d) => d.sections).filter((s) => s.text.includes('4×6-8'));
-  assert.equal(offers.length, 15);
-  for (const s of offers)
-    assert.deepEqual(
-      s.alternatives.map((a) => a.count),
-      [5, 4],
-    );
-});
-test('Test week drops non-test core work to 2 sets', () => {
-  for (const date of ['2027-01-05', '2027-01-07']) {
-    const exercises = days.find((d) => d.date === date).sections.flatMap((s) => s.exercises);
-    for (const name of ['Dead Bug', 'Calf Raises'])
-      assert.equal(exercises.find((e) => e.name === name).count, 2, `${date} ${name}`);
-  }
-});
-test('Progression suggestions apply only to W1-W7 rep ranges, never to pull-ups or chin-ups', () => {
+test('Progression suggestions apply only to W1 and W2 rep ranges, never to pull-ups or chin-ups', () => {
+  const advancing = days.flatMap((d) =>
+    d.sections.flatMap((s) => s.exercises.filter((e) => e.progression).map(() => d.code)),
+  );
+  assert.deepEqual([...new Set(advancing)], ['W1', 'W2']);
   for (const d of days)
     for (const s of d.sections)
       for (const e of s.exercises.filter((e) => e.progression)) {
-        assert.match(d.code, /^W[1-7]$/);
         assert.notEqual(e.top, null);
         assert.doesNotMatch(e.name, /Pull-Ups|Chin-Ups/);
       }
@@ -344,7 +321,7 @@ test('An exercise with a progression rule shows and records its stored current v
 test('Ticking a range or a max test records completion without a number', () => {
   for (const [date, id] of [
     ['2026-11-02', 'b2e0'],
-    ['2027-01-08', 'b4e0'],
+    ['2026-10-16', 'b5e0'],
   ]) {
     const e = exerciseOf(date, id);
     const key = setKey(date, e, 0);
@@ -470,19 +447,16 @@ test('A prescription line keeps the variation named in its lead-in', () => {
   const line = (text) => prescriptionLine(sectionWith(text));
   assert.equal(line('Hollow Hold (tucked): 3×20s · rest 45s'), 'tucked · 3×20s · rest 45s');
   assert.equal(line('L-Sit (tuck hold, floor)'), 'tuck hold, floor · 3×10s · rest 60s');
-  assert.equal(line('Single-Leg Calf Raises: 3×12/leg'), 'Single-Leg · 3×12/leg');
   assert.equal(line('Max Dead Hang'), 'Max · 1× max. Log it.');
 });
-test('Superset and test lines keep their wording, since it pairs names with numbers', () => {
+test('Superset lines keep their wording, since it pairs names with numbers', () => {
   for (const text of [
     'B. Superset ×3: Push-Ups 10 → Bulgarian Split Squats 6/leg · rest 90s',
-    'TEST: Pull-Ups, 1 max set. Log it. Then 2×3 easy · rest 2 min',
-    'Full Hollow 3×20-30s and L-Sit 3×15-20s again. Best of Tue/Thu counts.',
+    'B. Superset ×3: Push-Ups 12 → Bulgarian Split Squats 10/leg · rest 90s, then 1 more set of Push-Ups 12',
   ])
     assert.equal(prescriptionLine(sectionWith(text)), text);
 });
-test('A section that tests one exercise twice is headed by its name once', () => {
-  assert.equal(sectionWith('TEST: Pull-Ups, 1 max set.').name, 'Pull-Ups');
+test('A superset is headed by the names of both its exercises', () => {
   assert.equal(
     sectionWith('B. Superset ×3: Push-Ups 10').name,
     'Push-Ups + Bulgarian Split Squats',
@@ -490,8 +464,8 @@ test('A section that tests one exercise twice is headed by its name once', () =>
 });
 test('Today summarizes a program once its last day has passed', () => {
   assert.equal(finishedProgramAt('2026-10-22', {}), null);
-  assert.equal(finishedProgramAt('2027-01-10', {}), null);
-  assert.equal(finishedProgramAt('2027-01-11', {}).id, '2026-10-13');
+  assert.equal(finishedProgramAt('2026-11-15', {}), null);
+  assert.equal(finishedProgramAt('2026-11-16', {}).id, '2026-10-13');
   assert.equal(finishedProgramAt('2026-10-01', {}), null);
 });
 test('The URL keeps the screen and the chosen day', () => {
@@ -626,19 +600,20 @@ test('Workout times read as a clock while running and in minutes once recorded',
 const repeatEvent = (start, week = 'W1') =>
   event(`repeat-${start}`, repeatKey(start), { program: '2026-10-13', week, start });
 const withRepeat = (...events) => heads([repeatEvent('2026-11-09'), ...events]);
-test('Repeating W1 from Nov 9 slides the rest of the program back a week', () => {
+test('Repeating W1 from Nov 9 slides W2 back a week', () => {
   const map = withRepeat();
   const repeated = calendar(map);
-  assert.equal(repeated.length, 97);
-  assert.equal(new Set(repeated.map((d) => d.date)).size, 97);
-  assert.equal(programsIn(map)[0].end, '2027-01-17');
-  assert.equal(repeated.find((d) => d.date === '2027-01-16').title, '5K Victory Lap');
+  assert.equal(repeated.length, 41);
+  assert.equal(new Set(repeated.map((d) => d.date)).size, 41);
+  assert.equal(programsIn(map)[0].end, '2026-11-22');
+  // W2's long run, written for Sat Nov 14.
+  assert.equal(repeated.find((d) => d.date === '2026-11-21').sections[0].text, 'Run: 2.5 mi easy');
   const nov9 = repeated.find((d) => d.date === '2026-11-09');
   assert.equal(nov9.code, 'W1 (repeat)');
   assert.equal(nov9.week, 'W1');
-  assert.equal(nov9.sections[1].text, days.find((d) => d.date === '2026-11-02').sections[1].text);
+  assert.equal(nov9.sections[1].text, 'A. Pull-Ups: 5×2-5 · rest 2 min');
   assert.equal(repeated.find((d) => d.date === '2026-11-16').code, 'W2');
-  assert.equal(programsIn(map)[0].weeks.slice(2, 6).join(), 'R3,W1,W1 (repeat),W2');
+  assert.equal(programsIn(map)[0].weeks.join(), 'R1,R2,R3,W1,W1 (repeat),W2');
 });
 test('A repeated week leaves earlier workouts and their results alone', () => {
   const map = withRepeat(...tick('2026-11-02', requiredSets('2026-11-02')));
@@ -655,14 +630,15 @@ test('A second repeat rewinds again and is labeled by how often the week has run
   const repeated = calendar(map);
   assert.equal(repeated.find((d) => d.date === '2026-11-16').code, 'W1 (repeat 2)');
   assert.equal(repeated.find((d) => d.date === '2026-11-23').code, 'W2');
-  assert.equal(programsIn(map)[0].end, '2027-01-24');
+  assert.equal(programsIn(map)[0].end, '2026-11-29');
 });
 test('Choosing an earlier week runs every week after it again', () => {
   const map = heads([repeatEvent('2026-11-09', 'R3')]);
   const repeated = calendar(map);
   assert.equal(repeated.find((d) => d.date === '2026-11-09').code, 'R3 (repeat)');
   assert.equal(repeated.find((d) => d.date === '2026-11-16').code, 'W1 (repeat)');
-  assert.equal(programsIn(map)[0].end, '2027-01-24');
+  assert.equal(repeated.find((d) => d.date === '2026-11-23').code, 'W2');
+  assert.equal(programsIn(map)[0].end, '2026-11-29');
 });
 const w1 = { program: '2026-10-13', week: 'W1' };
 test('A repeat starts on its week’s weekday, today or later, after everything logged', () => {
@@ -675,8 +651,8 @@ test('A repeat starts on its week’s weekday, today or later, after everything 
   assert.equal(earliestRepeat(logged, w1, '2026-11-07'), '2026-11-16');
   assert.ok(previewRepeat(logged, { ...w1, start: '2026-11-09' }, '2026-11-07').problem);
   assert.ok(previewRepeat({}, { ...w1, start: '2026-11-10' }, '2026-11-07').problem);
-  assert.equal(previewRepeat({}, { ...w1, start: '2026-11-09' }, '2026-11-07').end, '2027-01-17');
-  assert.equal(previewRepeat({}, { ...w1, start: '2026-11-16' }, '2026-11-07').end, '2027-01-24');
+  assert.equal(previewRepeat({}, { ...w1, start: '2026-11-09' }, '2026-11-07').end, '2026-11-22');
+  assert.equal(previewRepeat({}, { ...w1, start: '2026-11-16' }, '2026-11-07').end, '2026-11-29');
 });
 test('A tick taken back or an empty clock does not hold a date', () => {
   const map = heads([
@@ -691,9 +667,9 @@ test('A tick taken back or an empty clock does not hold a date', () => {
 });
 test('A repeat clears moves and set counts on the dates it takes over, and no others', () => {
   const map = heads([
-    event('future-move', 'schedule:2026-11-20', {
-      due: '2026-11-21',
-      originalDate: '2026-11-20',
+    event('future-move', 'schedule:2026-11-13', {
+      due: '2026-11-14',
+      originalDate: '2026-11-13',
       lateMove: false,
     }),
     event('missed-move', 'schedule:2026-11-05', {
@@ -701,15 +677,15 @@ test('A repeat clears moves and set counts on the dates it takes over, and no ot
       originalDate: '2026-11-05',
       lateMove: true,
     }),
-    event('future-count', 'config:2026-11-20:b1e0', { count: 4 }),
+    event('future-count', 'config:2026-11-13:b1e0', { count: 4 }),
   ]);
   const changes = repeatChanges(map, { ...w1, start: '2026-11-09' });
   assert.deepEqual(changes.map((c) => c.entity).sort(), [
-    'config:2026-11-20:b1e0',
+    'config:2026-11-13:b1e0',
     'repeat:2026-11-09',
-    'schedule:2026-11-20',
+    'schedule:2026-11-13',
   ]);
-  assert.equal(changes.find((c) => c.entity === 'schedule:2026-11-20').data, null);
+  assert.equal(changes.find((c) => c.entity === 'schedule:2026-11-13').data, null);
 });
 test('A repeat can be undone until something is logged from its start on', () => {
   assert.equal(canUndoRepeat(withRepeat(), '2026-11-09'), true);
@@ -722,8 +698,8 @@ test('A repeat can be undone until something is logged from its start on', () =>
     repeatEvent('2026-11-09'),
     event('undo', repeatKey('2026-11-09'), null, ['repeat-2026-11-09']),
   ]);
-  assert.equal(calendar(undone).length, 90);
-  assert.equal(programsIn(undone)[0].end, '2027-01-10');
+  assert.equal(calendar(undone).length, 34);
+  assert.equal(programsIn(undone)[0].end, '2026-11-15');
   assert.equal(canUndoRepeat(undone, '2026-11-09'), false);
 });
 test('Repeat events validate, and malformed ones are rejected', () => {
