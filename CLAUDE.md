@@ -11,8 +11,8 @@ Reuel is the only developer and the app's only user.
 ## Workflow
 
 - **Every change reaches `main` through a PR**, one issue per PR, squash merged. A ruleset on GitHub refuses a direct push.
-- **Each branch gets its own worktree.** Before starting one (a session outside `.claude/worktrees/`) or removing a merged one, read `docs/agents/worktrees.md`.
-- **In a worktree:** Write and Edit for files, one plain command per Bash call, and `--body-file` for `gh` bodies; the isolation guard refuses the rest (`docs/agents/worktrees.md` lists it).
+- **Each branch gets its own worktree.** Before starting or setting one up, or removing a merged one, read `docs/agents/worktrees.md`.
+- **In a worktree:** Write and Edit for files, one plain command per Bash call with paths written out, and `--body-file` for `gh` bodies. `docs/agents/worktrees.md` lists what the isolation guard refuses.
 - **PR titles** are Conventional Commits scoped to one of `today`, `schedule`, `progress`, `timer`, `sync`, `program`, `docs`, `ci` or `deps`, such as `feat(schedule): repeat a week`.
 - A PR's CI runs the checks in `.github/workflows/deploy.yml`, and a merge deploys to GitHub Pages: **a merge is a release**.
 - **Before a merge**, check that CI passed (`gh pr checks <pr>`), every box on the issue the PR closes is ticked, and nothing in the PR's title, body or commits credits Claude. Tell Reuel about any conflict first, and merge only once Reuel says to, with `gh pr merge <pr> --squash --delete-branch`.

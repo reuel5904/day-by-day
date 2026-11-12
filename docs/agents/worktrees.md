@@ -1,11 +1,11 @@
 # Worktrees
 
-Each branch gets its own worktree, so parallel sessions never share a folder. Branches are short-lived, and their names start `feat/` (refactors too), `fix/` or `chore/`.
+A worktree per branch means parallel sessions never share a folder. Branches are short-lived, and their names start `feat/` (refactors too), `fix/` or `chore/`.
 
 ## Starting one
 
 1. A session outside `.claude/worktrees/` calls `EnterWorktree` first, unless it's in another worktree (The desktop app and T3 Code, below).
-2. In the worktree, one command per call: `git fetch`, `git merge --ff-only origin/main`, `git branch -m <branch name>`, then `npm ci`.
+2. In the worktree: `git fetch`, `git merge --ff-only origin/main`, `git branch -m <branch name>`, then `npm ci`.
 
 The app needs no gitignored file to run, so the repo has no `.worktreeinclude`.
 
@@ -22,6 +22,6 @@ Both apps run Claude Code, and `EnterWorktree` and `ExitWorktree` are Claude Cod
 
 When Reuel asks to clean up after a merge, and once `git status` is clean and the merged-branch diff check (Safety, in the global `CLAUDE.md`) passes, stop what the worktree still runs: removing its folder stops nothing, and a leftover dev server (`npm run dev`) keeps its port and a core busy. First stop the background commands your session started. Then `pgrep -fl <worktree path>/`, with the path written out, finds the rest by command (no output, and exit code 1, means none). Read each one's command, then `kill <pid>` the ones this worktree started, never your own session's or another session's.
 
-Then `ExitWorktree` with `remove` and `discard_changes: true`, since a squash merge leaves the branch's commits looking unmerged. It deletes only the branch it created (`worktree-<name>`), so delete the renamed branch afterwards (Safety, `git branch -D`).
+Then `ExitWorktree` with `remove` and `discard_changes: true`, since a squash merge leaves the branch's commits looking unmerged. It deletes only the branch it created (`worktree-<name>`), so delete the renamed branch afterwards (Safety, in the global `CLAUDE.md`, on `git branch -D`).
 
 After that, if `ExitWorktree` put the session back in the main checkout, run `git pull --ff-only` there when `git status` is clean and the branch is `main`. Sessions there load `CLAUDE.md` and the docs from disk at start, so they'd otherwise read rules from before the merge. Otherwise (a dirty tree, another branch, or a session that started inside `.claude/worktrees/`), skip it and tell Reuel to pull.
