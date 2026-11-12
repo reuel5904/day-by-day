@@ -8,10 +8,8 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# Deploys queue one at a time; a PR's new push cancels its earlier run.
+# Deploys run one at a time; a PR's new push cancels its earlier run.
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'pages' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -40,6 +38,9 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

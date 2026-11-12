@@ -20,7 +20,7 @@ Both apps run Claude Code, and `EnterWorktree` and `ExitWorktree` are Claude Cod
 
 ## Removing a merged one
 
-Once `git status` is clean and the merged-branch diff check (global `CLAUDE.md`) is empty, stop what the worktree still runs, since removing its folder stops nothing, and a leftover dev server keeps its port. First stop the background commands your session started. Then `pgrep -fl <worktree path>/`, with the path written out, finds the rest by command (no output, and exit code 1, means none). Read each one's command, then `kill <pid>` the ones this worktree started, never your own session's or another session's.
+When Reuel asks to clean up after a merge, and once `git status` is clean and the merged-branch diff check (global `CLAUDE.md`) passes, stop what the worktree still runs, since removing its folder stops nothing, and a leftover dev server keeps its port. First stop the background commands your session started. Then `pgrep -fl <worktree path>/`, with the path written out, finds the rest by command (no output, and exit code 1, means none). Read each one's command, then `kill <pid>` the ones this worktree started, never your own session's or another session's.
 
 Then `ExitWorktree` with `remove` and `discard_changes: true`, since a squash merge leaves the branch's commits looking unmerged. It deletes only the branch it created (`worktree-<name>`), so `git branch -D` the renamed branch afterwards.
 
