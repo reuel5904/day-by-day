@@ -16,7 +16,7 @@ export default function ProgressOverview({
 }) {
   const summary = progressSummary(map, today);
   // The week both charts open on: this one, or the nearest the programs cover.
-  const shownWeek =
+  const openingWeek =
     summary.thisWeek ??
     summary.weeks.filter((week) => week.start <= today).at(-1) ??
     summary.weeks[0];
@@ -24,10 +24,10 @@ export default function ProgressOverview({
   const rhythmScroll = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     for (const scroller of [weeklyScroll.current, rhythmScroll.current]) {
-      const shown = scroller?.querySelector('[data-shown]');
-      if (!scroller || !shown) continue;
+      const opening = scroller?.querySelector('[data-opening]');
+      if (!scroller || !opening) continue;
       const box = scroller.getBoundingClientRect(),
-        target = shown.getBoundingClientRect();
+        target = opening.getBoundingClientRect();
       scroller.scrollLeft += target.left - box.left - (box.width - target.width) / 2;
       scroller.scrollTop += target.top - box.top - (box.height - target.height) / 2;
     }
@@ -93,7 +93,7 @@ export default function ProgressOverview({
                 <div
                   className={`weekly-history-column ${week.start > today ? 'future-week' : ''} ${week === summary.thisWeek ? 'current-week' : ''} ${week.programStart ? 'program-start' : ''}`}
                   key={week.start}
-                  data-shown={week === shownWeek || undefined}
+                  data-opening={week === openingWeek || undefined}
                   title={`${dateLabel(week.start)}: ${week.completed} of ${week.planned} workouts complete, ${week.partial} partial`}
                 >
                   <span className="weekly-history-program">
@@ -172,7 +172,7 @@ export default function ProgressOverview({
             <h2>Your training rhythm</h2>
           </div>
           <span>
-            {dateLabel(summary.first)} — {dateLabel(summary.last)}
+            {dateLabel(summary.start)} — {dateLabel(summary.end)}
           </span>
         </div>
         <div className="recovery-note">
@@ -200,11 +200,11 @@ export default function ProgressOverview({
                   <b>{week.programStart.title}</b> starts {dateLabel(week.programStart.start)}
                 </div>
               )}
-              <div className="rhythm-week" data-shown={week === shownWeek || undefined}>
+              <div className="rhythm-week" data-opening={week === openingWeek || undefined}>
                 <span className="rhythm-week-label">{dateLabel(week.start)}</span>
                 {Array.from({ length: 7 }, (_, i) => {
                   const date = addDays(week.start, i);
-                  if (date < summary.first || date > summary.last)
+                  if (date < summary.start || date > summary.end)
                     return <span className="rhythm-placeholder" key={date} />;
                   const { status, target, workoutCount } = calendarDay(date, map, today);
                   return (

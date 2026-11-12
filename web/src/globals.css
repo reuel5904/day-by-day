@@ -4488,8 +4488,9 @@ main {
   font-size: 13px;
   color: var(--green-text);
 }
-/* A rule down the left of the week a program starts in, with its title running over the weeks after. */
-.program-start::before {
+/* A rule down the left of the week a program starts in, with its title running over the weeks
+   after. The first week needs none: the chart starts there. */
+.weekly-history-column.program-start:not(:first-child)::before {
   content: '';
   position: absolute;
   top: 0;

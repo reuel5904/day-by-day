@@ -59,8 +59,8 @@ export function calendarDay(date: string, map: History, today: string) {
 
 // Every number covers all programs; `thisProgram` repeats the counts for the program today is in.
 export function progressSummary(map: History, today: string) {
-  const days = calendar(map);
-  const training = days.filter((day) => day.sections.length);
+  const all = calendar(map);
+  const training = all.filter((day) => day.sections.length);
   const statuses = new Map(training.map((day) => [day.date, workoutStatus(day, map, today)]));
   const statusOf = (day: Day) => statuses.get(day.date)!;
   const isDone = (day: Day) => {
@@ -68,12 +68,12 @@ export function progressSummary(map: History, today: string) {
     return isFinished(status) && (!status.actualDate || status.actualDate <= today);
   };
   const results = resultEntries(map).filter((result) => result.actualDate <= today);
-  const countsFor = (own: Day[]) => {
-    const dates = new Set(own.map((day) => day.date));
-    const finished = own.filter(isDone);
+  const countsFor = (days: Day[]) => {
+    const dates = new Set(days.map((day) => day.date));
+    const finished = days.filter(isDone);
     const activeDates = new Set<string>();
     let sets = 0;
-    for (const day of own) {
+    for (const day of days) {
       const { actualDate } = statusOf(day);
       if (actualDate && actualDate <= today) activeDates.add(actualDate);
       for (const { key, unit } of completedKeys(day, map)) {
@@ -100,12 +100,12 @@ export function progressSummary(map: History, today: string) {
     };
   };
   const programs = programsIn(map);
-  const first = programs[0].start,
-    last = programs.at(-1)!.end;
-  const firstMonday = mondayOf(first);
+  const start = programs[0].start,
+    end = programs.at(-1)!.end;
+  const firstMonday = mondayOf(start);
   const weekCount =
     Math.round(
-      (Date.parse(mondayOf(last) + 'T12:00:00') - Date.parse(firstMonday + 'T12:00:00')) /
+      (Date.parse(mondayOf(end) + 'T12:00:00') - Date.parse(firstMonday + 'T12:00:00')) /
         (7 * 86400000),
     ) + 1;
   const weeks = Array.from({ length: weekCount }, (_, i) => {
@@ -128,13 +128,13 @@ export function progressSummary(map: History, today: string) {
   return {
     ...countsFor(training),
     thisProgram: countsFor(training.filter((day) => day.program === current.id)),
-    first,
-    last,
+    start,
+    end,
     weeks,
     thisWeek: weeks.find((week) => week.start === mondayOf(today)),
     partial: training.filter((day) => statusOf(day).id === 'partial').length,
     inProgress: training.filter((day) => statusOf(day).id === 'started').length,
-    restDays: days.filter((day) => !day.sections.length && effectiveDate(day, map) <= today).length,
+    restDays: all.filter((day) => !day.sections.length && effectiveDate(day, map) <= today).length,
   };
 }
 
