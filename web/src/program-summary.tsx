@@ -27,7 +27,7 @@ export function PersonalBestRows({ bests }: { bests: any[] }) {
   ));
 }
 
-// Today after a program's last day: how it went, and its final test numbers.
+// A finished program, on Today or opened from Progress: how it went, and its final test numbers.
 export default function ProgramSummary({
   map,
   program,

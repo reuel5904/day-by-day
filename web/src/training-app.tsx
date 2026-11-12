@@ -89,6 +89,7 @@ import {
   workoutSets,
   workoutStatus,
   finishedProgramAt,
+  finishedPrograms,
   hashForScreen,
   screenFromHash,
   type Screen,
@@ -274,7 +275,14 @@ export default function TrainingApp({ user }: { user: User }) {
   const days = calendar(map);
   const chosen = screen.date && days.some((d) => d.date === screen.date) ? screen.date : null;
   const selected = chosen ?? firstToday(days, today);
-  const finished = view === 'today' && !chosen ? finishedProgramAt(today, map) : null;
+  const programsFinished = finishedPrograms(today, map);
+  // The program whose summary is showing: on Today once it has ended, or one chosen on Progress.
+  const summarized =
+    view === 'today' && !chosen
+      ? finishedProgramAt(today, map)
+      : view === 'progress'
+        ? (programsFinished.find((p) => p.id === screen.program) ?? null)
+        : null;
   const day = days.find((d) => d.date === selected)!;
   const status = workoutStatus(day, map, today);
   const recordedSessionDate = status.actualDate;
@@ -1125,15 +1133,15 @@ export default function TrainingApp({ user }: { user: User }) {
             <span className="breadcrumb">
               YOUR TRAINING <ChevronRight size={13} />
               <b>
-                {view === 'today'
-                  ? finished
-                    ? 'Program summary'
-                    : due(day) === today
+                {summarized
+                  ? 'Program summary'
+                  : view === 'today'
+                    ? due(day) === today
                       ? 'Today'
                       : 'Workout'
-                  : view === 'schedule'
-                    ? 'Schedule'
-                    : 'Progress'}
+                    : view === 'schedule'
+                      ? 'Schedule'
+                      : 'Progress'}
               </b>
             </span>
           </div>
@@ -1181,15 +1189,15 @@ export default function TrainingApp({ user }: { user: User }) {
               <ArrowRight size={16} />
             </button>
           )}
-          {finished && (
+          {summarized && (
             <ProgramSummary
               map={map}
-              program={finished}
+              program={summarized}
               today={today}
               onOpen={(next) => go({ view: next })}
             />
           )}
-          {view === 'today' && !finished && (
+          {view === 'today' && !summarized && (
             <>
               <section className="week-strip" aria-label="Week navigation">
                 <button
@@ -1886,7 +1894,7 @@ export default function TrainingApp({ user }: { user: User }) {
                 ))}
             </>
           )}
-          {view === 'progress' && (
+          {view === 'progress' && !summarized && (
             <>
               <div className="page-heading">
                 <div>
@@ -1996,6 +2004,29 @@ export default function TrainingApp({ user }: { user: User }) {
                 ))}
                 {!recentWorkouts.length && <p className="empty-line">No workouts yet.</p>}
               </section>
+              {programsFinished.length > 0 && (
+                <section className="recent-history">
+                  <div className="section-heading">
+                    <h2>Finished programs</h2>
+                    <Flag size={20} />
+                  </div>
+                  {[...programsFinished].reverse().map((p) => (
+                    <button
+                      className="history-row"
+                      key={p.id}
+                      onClick={() => go({ view: 'progress', program: p.id })}
+                    >
+                      <Flag size={18} />
+                      <strong>{p.title}</strong>
+                      <span>
+                        {dateLabel(p.start)} – {dateLabel(p.end)}
+                      </span>
+                      <b>Summary</b>
+                      <ArrowUpRight size={16} />
+                    </button>
+                  ))}
+                </section>
+              )}
             </>
           )}
           <footer className="page-footer">
@@ -2005,7 +2036,7 @@ export default function TrainingApp({ user }: { user: User }) {
           </footer>
         </main>
       </div>
-      {view === 'today' && !finished && (
+      {view === 'today' && !summarized && (
         <div className={`mobile-timer ${timerOpen ? 'expanded' : ''}`}>
           <button
             className="mobile-timer-toggle"
