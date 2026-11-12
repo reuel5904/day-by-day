@@ -990,7 +990,10 @@ export default function TrainingApp({ user }: { user: User }) {
       (b.status.actualDate || b.day.date).localeCompare(a.status.actualDate || a.day.date),
     )
     .slice(0, 10);
-  const totalComplete = programDays(program, map).filter(
+  // The Schedule starts at the running program, or at an earlier one whose day is open, and
+  // lists every program after it.
+  const scheduled = program.start <= currentProgram.start ? program : currentProgram;
+  const totalComplete = programDays(scheduled, map).filter(
     (d) => d.sections.length && isFinished(workoutStatus(d, map, today)),
   ).length;
   const trendNames = Array.from(
@@ -1719,13 +1722,18 @@ export default function TrainingApp({ user }: { user: User }) {
               <div className="page-heading">
                 <div>
                   <span className="eyebrow">
-                    {dateLabel(program.start, { month: 'short', day: 'numeric', year: 'numeric' })}{' '}
-                    — {dateLabel(program.end, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {dateLabel(scheduled.start, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}{' '}
+                    —{' '}
+                    {dateLabel(scheduled.end, { month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                   <h1>
-                    {program.title}. <span>Day by day.</span>
+                    {scheduled.title}. <span>Day by day.</span>
                   </h1>
-                  <p>{program.summary}</p>
+                  <p>{scheduled.summary}</p>
                 </div>
                 <button className="secondary" onClick={() => go({ view: 'today' })}>
                   Jump to today
@@ -1735,126 +1743,138 @@ export default function TrainingApp({ user }: { user: User }) {
               <div className="schedule-intro">
                 <Flag size={23} />
                 <div>
-                  <strong>{programDays(program, map).length} days of building something.</strong>
+                  <strong>{programDays(scheduled, map).length} days of building something.</strong>
                   <p>
                     {totalComplete} of{' '}
-                    {programDays(program, map).filter((d) => d.sections.length).length} workouts
-                    completed · {program.note}
+                    {programDays(scheduled, map).filter((d) => d.sections.length).length} workouts
+                    completed · {scheduled.note}
                   </p>
                 </div>
               </div>
-              {[program, ...programsIn(map).filter((p) => p.start > program.end)].map((p) => (
-                <Fragment key={p.id}>
-                  {p !== program && (
-                    <div className="page-heading up-next">
-                      <div>
-                        <span className="eyebrow">
-                          Up next ·{' '}
-                          {dateLabel(p.start, { month: 'short', day: 'numeric', year: 'numeric' })}{' '}
-                          — {dateLabel(p.end, { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
-                        <h2>{p.title}</h2>
-                        <p>{p.summary}</p>
+              {programsIn(map)
+                .filter((p) => p.start >= scheduled.start)
+                .map((p) => ({ p, own: programDays(p, map) }))
+                .map(({ p, own }) => (
+                  <Fragment key={p.id}>
+                    {p.id !== scheduled.id && (
+                      <div className="page-heading up-next">
+                        <div>
+                          <span className="eyebrow">
+                            {p.start > today ? 'Up next · ' : ''}
+                            {dateLabel(p.start, {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}{' '}
+                            —{' '}
+                            {dateLabel(p.end, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                          <h2>{p.title}</h2>
+                          <p>{p.summary}</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  <div className="schedule-weeks">
-                    {p.weeks.map((code) => {
-                      const list = programDays(p, map).filter((d) => d.code === code);
-                      return (
-                        <details className="schedule-week" key={code} open={code === day.code}>
-                          <summary>
-                            <div>
-                              <span className="week-code">{list[0].week}</span>
+                    )}
+                    <div className="schedule-weeks">
+                      {p.weeks.map((code) => {
+                        const list = own.filter((d) => d.code === code);
+                        return (
+                          <details
+                            className="schedule-week"
+                            key={code}
+                            open={p.id === day.program && code === day.code}
+                          >
+                            <summary>
                               <div>
-                                <h2>{list[0].phase}</h2>
-                                <span>
-                                  {dateLabel(list[0].date)} — {dateLabel(list.at(-1)!.date)}
-                                  {code !== list[0].week && ' · Repeat'}
-                                </span>
+                                <span className="week-code">{list[0].week}</span>
+                                <div>
+                                  <h2>{list[0].phase}</h2>
+                                  <span>
+                                    {dateLabel(list[0].date)} — {dateLabel(list.at(-1)!.date)}
+                                    {code !== list[0].week && ' · Repeat'}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                            <ChevronDown size={19} />
-                          </summary>
-                          <div className="schedule-days">
-                            {list.map((d) => {
-                              const status = workoutStatus(d, map, today);
-                              return (
-                                <button
-                                  key={d.date}
-                                  className={`schedule-day ${!d.sections.length ? 'rest-day' : ''} ${due(d) === today ? 'current-day' : ''}`}
-                                  onClick={() => chooseDay(d.date)}
-                                >
-                                  <span className="schedule-date">
-                                    <b>{dateLabel(due(d), { weekday: 'short' })}</b>
-                                    <strong>{dateLabel(due(d), { day: 'numeric' })}</strong>
-                                  </span>
-                                  <span
-                                    className={`schedule-kind ${!d.sections.length ? 'recovery' : isRunDay(d) ? 'running' : 'strength'}`}
+                              <ChevronDown size={19} />
+                            </summary>
+                            <div className="schedule-days">
+                              {list.map((d) => {
+                                const status = workoutStatus(d, map, today);
+                                return (
+                                  <button
+                                    key={d.date}
+                                    className={`schedule-day ${!d.sections.length ? 'rest-day' : ''} ${due(d) === today ? 'current-day' : ''}`}
+                                    onClick={() => chooseDay(d.date)}
                                   >
-                                    {!d.sections.length ? (
-                                      <Leaf size={19} />
-                                    ) : isRunDay(d) ? (
-                                      <Footprints size={19} />
-                                    ) : (
-                                      <Dumbbell size={19} />
-                                    )}
-                                  </span>
-                                  <span className="schedule-day-copy">
-                                    <strong>{d.title}</strong>
-                                    <span>
-                                      {due(d) !== d.date
-                                        ? `Moved from ${dateLabel(d.date)} · `
-                                        : ''}
-                                      {status.id === 'upcoming' && due(d) !== today
-                                        ? `${d.sections.length} sections`
-                                        : status.label}
+                                    <span className="schedule-date">
+                                      <b>{dateLabel(due(d), { weekday: 'short' })}</b>
+                                      <strong>{dateLabel(due(d), { day: 'numeric' })}</strong>
                                     </span>
-                                  </span>
-                                  {isFinished(status) ? (
-                                    <Check size={20} className="green" />
-                                  ) : (
-                                    <ArrowUpRight size={18} />
-                                  )}
+                                    <span
+                                      className={`schedule-kind ${!d.sections.length ? 'recovery' : isRunDay(d) ? 'running' : 'strength'}`}
+                                    >
+                                      {!d.sections.length ? (
+                                        <Leaf size={19} />
+                                      ) : isRunDay(d) ? (
+                                        <Footprints size={19} />
+                                      ) : (
+                                        <Dumbbell size={19} />
+                                      )}
+                                    </span>
+                                    <span className="schedule-day-copy">
+                                      <strong>{d.title}</strong>
+                                      <span>
+                                        {due(d) !== d.date
+                                          ? `Moved from ${dateLabel(d.date)} · `
+                                          : ''}
+                                        {status.id === 'upcoming' && due(d) !== today
+                                          ? `${d.sections.length} sections`
+                                          : status.label}
+                                      </span>
+                                    </span>
+                                    {isFinished(status) ? (
+                                      <Check size={20} className="green" />
+                                    ) : (
+                                      <ArrowUpRight size={18} />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <div className="schedule-week-actions">
+                              {canUndoRepeat(map, list[0].date) && (
+                                <button
+                                  className="text-link"
+                                  onClick={() => {
+                                    write(repeatKey(list[0].date), null);
+                                    notify(
+                                      'Repeat undone. The weeks after it moved back into place.',
+                                    );
+                                  }}
+                                >
+                                  Undo this repeat
+                                  <RotateCcw size={15} />
                                 </button>
-                              );
-                            })}
-                          </div>
-                          <div className="schedule-week-actions">
-                            {canUndoRepeat(map, list[0].date) && (
-                              <button
-                                className="text-link"
-                                onClick={() => {
-                                  write(repeatKey(list[0].date), null);
-                                  notify(
-                                    'Repeat undone. The weeks after it moved back into place.',
-                                  );
-                                }}
-                              >
-                                Undo this repeat
-                                <RotateCcw size={15} />
-                              </button>
-                            )}
-                            {list[0].date <= today && (
-                              <button
-                                className="text-link"
-                                onClick={() => {
-                                  const week = { program: p.id, week: list[0].week };
-                                  setRepeat({ ...week, start: earliestRepeat(map, week, today) });
-                                  setModal('repeat');
-                                }}
-                              >
-                                Repeat this week
-                                <ArrowRight size={15} />
-                              </button>
-                            )}
-                          </div>
-                        </details>
-                      );
-                    })}
-                  </div>
-                </Fragment>
-              ))}
+                              )}
+                              {list[0].date <= today && (
+                                <button
+                                  className="text-link"
+                                  onClick={() => {
+                                    const week = { program: p.id, week: list[0].week };
+                                    setRepeat({ ...week, start: earliestRepeat(map, week, today) });
+                                    setModal('repeat');
+                                  }}
+                                >
+                                  Repeat this week
+                                  <ArrowRight size={15} />
+                                </button>
+                              )}
+                            </div>
+                          </details>
+                        );
+                      })}
+                    </div>
+                  </Fragment>
+                ))}
             </>
           )}
           {view === 'progress' && (
