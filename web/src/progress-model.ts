@@ -128,7 +128,7 @@ const score = (result: { value: number; right?: number; sides?: boolean }) =>
   result.sides ? Math.min(result.value, result.right ?? 0) : result.value;
 
 // Each tested exercise's best result in the last week that tests it, and the best from the
-// first week that did, when that was earlier: the final dead hang against Oct 16.
+// first week that did, when that was earlier: a final dead hang against the first one.
 function testResults(map: History, program: Program) {
   const sets = programDays(program, map).flatMap((day) =>
     day.sections.flatMap((section) =>

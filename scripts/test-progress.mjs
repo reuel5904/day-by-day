@@ -183,37 +183,29 @@ const logged = (date, id, i, value, extra = {}) => {
     ...extra,
   });
 };
-test('The program summary takes the best of each test and compares the dead hang with Oct 16', () => {
+test('The program summary reports the one test the program has, the Oct 16 dead hang', () => {
   const map = heads([
     logged('2026-10-16', 'b5e0', 0, 30),
-    logged('2027-01-04', 'b1e0', 0, 8),
-    logged('2027-01-04', 'b1e1', 0, 12),
-    logged('2027-01-05', 'b2e0', 0, 25),
-    logged('2027-01-05', 'b2e0', 1, 28),
-    logged('2027-01-07', 'b2e0', 2, 30),
-    logged('2027-01-06', 'b2e0', 0, 3, { right: 2 }),
-    logged('2027-01-08', 'b4e0', 0, 45),
+    // Later max dead hangs are not marked as tests, so they never replace it.
+    logged('2026-11-13', 'b5e0', 0, 45),
   ]);
-  const { tests } = programSummary(map, programs[0], '2027-01-11');
+  const { tests } = programSummary(map, programs[0], '2026-11-16');
   assert.deepEqual(
-    tests.map((t) => [t.name, t.best?.value, t.best?.right, t.baseline?.value, t.baseline?.date]),
-    [
-      ['Pull-Ups', 8, undefined, undefined, undefined],
-      ['Hollow Hold', 30, undefined, undefined, undefined],
-      ['L-Sit', undefined, undefined, undefined, undefined],
-      ['Chin-Ups', undefined, undefined, undefined, undefined],
-      ['Pistol Squat', 3, 2, undefined, undefined],
-      ['Dead Hang', 45, undefined, 30, '2026-10-16'],
-    ],
+    tests.map((t) => [t.name, t.best?.value, t.best?.date, t.baseline]),
+    [['Dead Hang', 30, '2026-10-16', undefined]],
+  );
+  assert.deepEqual(
+    programSummary({}, programs[0], '2026-11-16').tests.map((t) => [t.name, t.best]),
+    [['Dead Hang', undefined]],
   );
 });
 test('The program summary counts completed workouts against planned ones and the best streak', () => {
   const map = heads(
     ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-23'].flatMap((d) => tickAll(d)),
   );
-  const summary = programSummary(map, programs[0], '2027-01-11');
+  const summary = programSummary(map, programs[0], '2026-11-16');
   assert.equal(summary.completed, 4);
-  assert.equal(summary.planned, 77);
+  assert.equal(summary.planned, 29);
   assert.equal(summary.bestStreak, 3);
   assert.equal(summary.averageDuration, null);
 });
@@ -225,21 +217,24 @@ test('The program summary averages the recorded times of finished workouts', () 
     clock('2026-10-20', { elapsed: 3600, since: null }),
     clock('2026-10-22', { elapsed: 600, since: null }),
   ]);
-  assert.equal(programSummary(map, programs[0], '2027-01-11').averageDuration, 3000);
+  assert.equal(programSummary(map, programs[0], '2026-11-16').averageDuration, 3000);
 });
 test('Personal bests compare results only within the same exercise variation', () => {
   const map = heads([
     logged('2026-10-13', 'b2e0', 0, 20),
     logged('2026-10-20', 'b2e0', 0, 25),
-    logged('2027-01-05', 'b2e0', 0, 22),
+    logged('2026-10-22', 'b3e0', 0, 12),
+    logged('2026-11-03', 'b3e0', 0, 15),
+    logged('2026-11-05', 'b3e0', 0, 14),
     logged('2026-10-20', 'b1e0', 0, 1.5),
   ]);
-  const { personalBests } = programSummary(map, programs[0], '2027-01-11');
+  const { personalBests } = programSummary(map, programs[0], '2026-11-16');
   assert.deepEqual(
     personalBests.map((r) => [r.name, r.variation, r.score]),
     [
-      ['Hollow Hold', 'full', 22],
       ['Hollow Hold', 'tucked', 25],
+      ['L-Sit', 'tuck', 15],
+      ['L-Sit', 'tuck hold', 12],
     ],
   );
 });
