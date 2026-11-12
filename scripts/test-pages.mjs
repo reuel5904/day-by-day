@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 await build({
   entryPoints: ['web/src/training-model.ts', 'web/src/exercises.ts'],
@@ -93,6 +94,8 @@ const changeEvents = (changes, map = {}) =>
       (map[c.entity] || []).map((e) => e.id),
     ),
   );
+const advancedTo = (name, variation) =>
+  heads([event('advance-' + name, `stage:${name}`, { variation, previous: '' })]);
 const sectionWith = (text) => days.flatMap((d) => d.sections).find((s) => s.text.startsWith(text));
 // What the original text parser produced for every workout up to Oct 22, as
 // "sectionExerciseId:sets:unit". Saved results are keyed by these IDs, so they must not change.
@@ -125,13 +128,327 @@ test('Workouts up to Oct 22 keep the IDs, set counts and units their history use
     assert.equal(actual, expected, date);
   }
 });
-test('The program keeps all 34 dated days with their written prescriptions', () => {
-  assert.equal(days.length, 34);
-  assert.equal(days[0].date, '2026-10-13');
-  assert.equal(days.at(-1).date, '2026-11-15');
-  assert.equal(new Set(days.map((d) => d.date)).size, 34);
+const daysOf = (program) => days.filter((d) => d.program === program);
+const fundamentals = daysOf('2026-11-16');
+test('The earlier program keeps all 34 dated days with their written prescriptions', () => {
+  const earlier = daysOf('2026-10-13');
+  assert.equal(earlier.length, 34);
+  assert.equal(earlier[0].date, '2026-10-13');
+  assert.equal(earlier.at(-1).date, '2026-11-15');
   assert.equal(programsIn({})[0].weeks.join(), 'R1,R2,R3,W1,W2');
   for (const d of days) for (const s of d.sections) assert.ok(s.text && s.exercises.length, d.date);
+});
+test('Fundamentals runs 70 days from Nov 16 to Jan 24, the day after the earlier program ends', () => {
+  assert.equal(fundamentals.length, 70);
+  assert.equal(fundamentals[0].date, '2026-11-16');
+  assert.equal(fundamentals.at(-1).date, '2027-01-24');
+  assert.deepEqual(
+    programsIn({}).map((p) => [p.id, p.title, p.start, p.end]),
+    [
+      ['2026-10-13', 'Stronger by January', '2026-10-13', '2026-11-15'],
+      ['2026-11-16', 'Fundamentals', '2026-11-16', '2027-01-24'],
+    ],
+  );
+  assert.equal(programsIn({})[1].weeks.join(), 'F1,F2,F3,F4,F5,F6,F7,F8,F9,F10');
+  // No date belongs to two programs, and none is skipped.
+  assert.equal(new Set(days.map((d) => d.date)).size, 104);
+  assert.equal(days.length, 104);
+});
+// What the owner sees for each exercise on a date: variation, sets × number, seconds down, rest.
+const written = (date) =>
+  fundamentals
+    .find((d) => d.date === date)
+    .sections.filter((s) => s.kind !== 'prep')
+    .flatMap((s) =>
+      s.exercises.map((e) =>
+        [
+          `${e.name} [${e.variation}] ${e.count}×${e.target || 'max'}`,
+          e.unit === 'sec' ? 's' : e.unit === 'run' ? ' mi' : '',
+          e.sides ? '/side' : '',
+          e.tempo && ` @ ${e.tempo}`,
+          s.rest ? ` · rest ${s.rest}` : '',
+          e.test ? ' · test' : '',
+        ].join(''),
+      ),
+    );
+const fridayTests = ['Pull-Ups [Standard] 1×max · test', 'Dead Hang [Standard] 1×maxs · test'];
+test('F1 starts every exercise at its written number', () => {
+  const lower = [
+    'Pike Push-Ups [Standard] 3×8 · rest 90',
+    'Bulgarian Split Squats [Standard] 3×12/side · rest 90',
+    'Glute Bridge [Single-Leg] 3×8/side · rest 60',
+  ];
+  const monday = [
+    'Negative Pull-Ups [Standard] 4×3 @ 5s · rest 120',
+    'Rows [Standard] 3×8 · rest 90',
+    'Push-Ups [Standard] 3×16 · rest 90',
+    ...lower,
+  ];
+  const core = [
+    'Hanging Knee Raises [Standard] 3×8 · rest 60',
+    'Hollow Hold [tucked] 3×30s · rest 45',
+    'Side Plank [Standard] 2×50s/side · rest 45',
+    'Calf Raises [single-leg] 3×12/side · rest 45',
+  ];
+  assert.deepEqual(written('2026-11-16'), monday);
+  assert.deepEqual(written('2026-11-17'), [
+    'Run [Easy run] 1×2.5 mi',
+    'Strides [Standard] 4×15s',
+    ...core,
+  ]);
+  assert.deepEqual(written('2026-11-18'), [
+    'Negative Pull-Ups [chin-up grip] 4×3 @ 5s · rest 120',
+    'Rows [Standard] 3×8 · rest 90',
+    'Push-Ups [Decline] 3×10 · rest 90',
+    ...lower,
+  ]);
+  assert.deepEqual(written('2026-11-19'), ['Run [Easy run] 1×2.5 mi', ...core]);
+  assert.deepEqual(written('2026-11-20'), [...monday, ...fridayTests]);
+  assert.deepEqual(written('2026-11-21'), ['Run [Easy run] 1×2.5 mi']);
+  assert.deepEqual(written('2026-11-22'), []);
+});
+test('F5 moves to Tempo Bulgarians and a low straight-leg Hollow Hold at lower numbers', () => {
+  const lower = [
+    'Pike Push-Ups [Standard] 3×12 · rest 90',
+    'Bulgarian Split Squats [Tempo Bulgarian] 3×10/side @ 3s · rest 90',
+    'Glute Bridge [Single-Leg] 3×12/side · rest 60',
+  ];
+  const core = [
+    'Hanging Knee Raises [Standard] 3×12 · rest 60',
+    'Hollow Hold [low straight-leg] 3×15s · rest 45',
+    'Side Plank [raised foot] 2×35s/side · rest 45',
+    'Calf Raises [single-leg] 3×16/side · rest 45',
+  ];
+  assert.deepEqual(written('2026-12-15'), [
+    'Run [Easy run] 1×3 mi',
+    'Strides [Standard] 4×15s',
+    ...core,
+  ]);
+  assert.deepEqual(written('2026-12-16'), [
+    'Negative Pull-Ups [chin-up grip] 4×4 @ 6s · rest 120',
+    'Rows [Standard] 3×12 · rest 90',
+    'Push-Ups [Decline] 3×14 · rest 90',
+    ...lower,
+  ]);
+  assert.deepEqual(written('2026-12-17'), ['Run [Easy run] 1×3 mi', ...core]);
+  assert.deepEqual(written('2026-12-18'), [
+    'Negative Pull-Ups [Standard] 4×4 @ 6s · rest 120',
+    'Rows [Standard] 3×12 · rest 90',
+    'Push-Ups [Standard] 3×20 · rest 90',
+    ...lower,
+    ...fridayTests,
+  ]);
+  assert.deepEqual(written('2026-12-19'), ['Run [Easy run] 1×3.5 mi']);
+});
+test('F6 deloads to 2 sets on the same variations as F5, without strides', () => {
+  const lower = [
+    'Pike Push-Ups [Standard] 2×8 · rest 90',
+    'Bulgarian Split Squats [Tempo Bulgarian] 2×8/side @ 3s · rest 90',
+    'Glute Bridge [Single-Leg] 2×8/side · rest 60',
+  ];
+  const runCore = [
+    'Run [Easy run] 1×2 mi',
+    'Hanging Knee Raises [Standard] 2×8 · rest 60',
+    'Hollow Hold [low straight-leg] 2×15s · rest 45',
+    'Side Plank [raised foot] 2×30s/side · rest 45',
+    'Calf Raises [single-leg] 2×12/side · rest 45',
+  ];
+  assert.deepEqual(written('2026-12-22'), runCore);
+  assert.deepEqual(written('2026-12-23'), [
+    'Negative Pull-Ups [chin-up grip] 2×3 @ 6s · rest 120',
+    'Rows [Standard] 2×10 · rest 90',
+    'Push-Ups [Decline] 2×10 · rest 90',
+    ...lower,
+  ]);
+  assert.deepEqual(written('2026-12-24'), runCore);
+  assert.deepEqual(written('2026-12-25'), [
+    'Negative Pull-Ups [Standard] 2×3 @ 6s · rest 120',
+    'Rows [Standard] 2×10 · rest 90',
+    'Push-Ups [Standard] 2×16 · rest 90',
+    ...lower,
+    ...fridayTests,
+  ]);
+  assert.deepEqual(written('2026-12-26'), ['Run [Easy run] 1×2.5 mi']);
+  const sets = fundamentals
+    .filter((d) => d.code === 'F6')
+    .flatMap((d) => d.sections.filter((s) => s.kind === 'exercise' || s.kind === 'superset'))
+    .flatMap((s) => s.exercises.filter((e) => !e.test).map((e) => e.count));
+  assert.deepEqual([...new Set(sets)], [2]);
+});
+test('F7 moves Rows feet further forward and Pike Push-Ups feet raised at lower numbers', () => {
+  const lower = [
+    'Pike Push-Ups [feet raised] 3×6 · rest 90',
+    'Bulgarian Split Squats [Tempo Bulgarian] 3×11/side @ 3s · rest 90',
+    'Glute Bridge [Single-Leg] 3×13/side · rest 60',
+  ];
+  const core = [
+    'Hanging Knee Raises [Standard] 3×13 · rest 60',
+    'Hollow Hold [low straight-leg] 3×20s · rest 45',
+    'Side Plank [raised foot] 2×40s/side · rest 45',
+    'Calf Raises [single-leg] 3×17/side · rest 45',
+  ];
+  assert.deepEqual(written('2026-12-29'), [
+    'Run [Easy run] 1×3 mi',
+    'Strides [Standard] 4×15s',
+    ...core,
+  ]);
+  assert.deepEqual(written('2026-12-30'), [
+    'Negative Pull-Ups [chin-up grip] 4×4 @ 7s · rest 120',
+    'Rows [feet further forward] 3×8 · rest 90',
+    'Push-Ups [Decline] 3×15 · rest 90',
+    ...lower,
+  ]);
+  assert.deepEqual(written('2026-12-31'), ['Run [Easy run] 1×3 mi', ...core]);
+  assert.deepEqual(written('2027-01-01'), [
+    'Negative Pull-Ups [Standard] 4×4 @ 7s · rest 120',
+    'Rows [feet further forward] 3×8 · rest 90',
+    'Push-Ups [Standard] 3×21 · rest 90',
+    ...lower,
+    ...fridayTests,
+  ]);
+  assert.deepEqual(written('2027-01-02'), ['Run [Easy run] 1×3.5 mi']);
+});
+test('F10 puts its tests first and drops everything else to 2 sets', () => {
+  const rows = 'Rows [feet further forward] 2×8 · rest 90';
+  const lower = [
+    'Pike Push-Ups [feet raised] 2×6 · rest 90',
+    'Bulgarian Split Squats [Tempo Bulgarian] 2×10/side @ 3s · rest 90',
+    'Glute Bridge [Single-Leg] 2×10/side · rest 60',
+  ];
+  const runCore = [
+    'Run [Easy run] 1×2 mi',
+    'Hanging Knee Raises [Standard] 2×10 · rest 60',
+    'Hollow Hold [low straight-leg] 2×30s · rest 45',
+    'Side Plank [raised foot] 2×45s/side · rest 45',
+    'Calf Raises [single-leg] 2×15/side · rest 45',
+  ];
+  assert.deepEqual(written('2027-01-18'), [
+    'Pull-Ups [Standard] 1×max · rest 120 · test',
+    'Negative Pull-Ups [Standard] 1×maxs · rest 120 · test',
+    rows,
+    ...lower,
+  ]);
+  assert.deepEqual(written('2027-01-19'), runCore);
+  assert.deepEqual(written('2027-01-20'), [
+    'Chin-Ups [Standard] 1×max · rest 120 · test',
+    rows,
+    'Push-Ups [Decline] 2×12 · rest 90',
+    ...lower,
+  ]);
+  assert.deepEqual(written('2027-01-21'), runCore);
+  assert.deepEqual(written('2027-01-22'), [
+    'Push-Ups [Standard] 1×max · rest 120 · test',
+    'Dead Hang [Standard] 1×maxs · rest 120 · test',
+    rows,
+    ...lower,
+  ]);
+  assert.deepEqual(written('2027-01-23'), ['Run [Easy run] 1×3 mi']);
+});
+const fundamentalsExercises = fundamentals.flatMap((d) =>
+  d.sections.flatMap((s) => s.exercises.map((e) => ({ ...e, date: d.date, code: d.code }))),
+);
+test('Every Fundamentals set has one fixed number, except the max tests', () => {
+  for (const d of fundamentals) for (const s of d.sections) assert.equal(s.alternatives, undefined);
+  for (const e of fundamentalsExercises) {
+    const where = `${e.date} ${e.name}`;
+    assert.equal(e.progression, false, where);
+    if (e.unit === 'check') continue;
+    if (e.test) assert.equal(e.target, '', where);
+    else assert.match(e.target, /^\d+(\.\d+)?$/, where);
+  }
+});
+test('Negatives keep their seconds down apart from their rep count, on both grips', () => {
+  const negatives = (weekday) =>
+    fundamentals
+      .filter((d) => d.title === 'Strength' && new Date(d.date + 'T12:00:00').getDay() === weekday)
+      .map((d) => d.sections[1].exercises[0])
+      .map((e) => `${e.name} [${e.variation}] ${e.count}×${e.target} ${e.unit} @ ${e.tempo}`);
+  const weekly = ['4×3', '4×3', '4×3', '4×3', '4×4', '2×3', '4×4', '4×4', '4×5'];
+  const seconds = [5, 6, 7, 8, 6, 6, 7, 8, 7];
+  for (const [weekday, variation] of [
+    [1, 'Standard'],
+    [3, 'chin-up grip'],
+    [5, 'Standard'],
+  ])
+    assert.deepEqual(
+      negatives(weekday),
+      weekly.map((sets, i) => `Negative Pull-Ups [${variation}] ${sets} reps @ ${seconds[i]}s`),
+    );
+  assert.equal(
+    fundamentalsExercises.some(
+      (e) => e.code === 'F10' && e.name === 'Negative Pull-Ups' && !e.test,
+    ),
+    false,
+  );
+});
+test('Fundamentals marks exactly the five agreed tests, on the agreed days', () => {
+  const tested = {};
+  for (const e of fundamentalsExercises.filter((e) => e.test)) (tested[e.name] ??= []).push(e.date);
+  const fridays = [
+    '2026-11-20',
+    '2026-11-27',
+    '2026-12-04',
+    '2026-12-11',
+    '2026-12-18',
+    '2026-12-25',
+    '2027-01-01',
+    '2027-01-08',
+    '2027-01-15',
+  ];
+  assert.deepEqual(tested, {
+    'Pull-Ups': [...fridays, '2027-01-18'],
+    'Dead Hang': [...fridays, '2027-01-22'],
+    'Negative Pull-Ups': ['2027-01-18'],
+    'Chin-Ups': ['2027-01-20'],
+    'Push-Ups': ['2027-01-22'],
+  });
+});
+test('Strides follow every Tuesday run except in the deload and test weeks', () => {
+  const strides = fundamentalsExercises.filter((e) => e.name === 'Strides');
+  assert.deepEqual(
+    strides.map((e) => e.code),
+    ['F1', 'F2', 'F3', 'F4', 'F5', 'F7', 'F8', 'F9'],
+  );
+  for (const e of strides) assert.equal(new Date(e.date + 'T12:00:00').getDay(), 2);
+});
+test('Ticking a Fundamentals set records its number and written variation, whatever was stored', () => {
+  const decline = fundamentalsExercises.find((e) => e.date === '2026-11-18' && e.id === 'b2e1');
+  const stored = advancedTo('Push-Ups', 'Archer');
+  assert.equal(currentVariation(stored, decline), 'Decline');
+  const key = setKey('2026-11-18', decline, 0);
+  const events = changeEvents(
+    completionChanges(stored, [{ key, exercise: decline }], '2026-11-18', '2026-11-18'),
+  );
+  assert.equal(validateEvents(events), true);
+  const [result] = resultEntries(heads(events));
+  assert.equal(result.name, 'Push-Ups');
+  assert.equal(result.value, 10);
+  assert.equal(result.variation, 'Decline');
+  const monday = fundamentalsExercises.find((e) => e.date === '2026-11-16' && e.id === 'b2e1');
+  assert.equal(currentVariation(stored, monday), 'Standard');
+});
+test('The Fundamentals roadmap and its structured data agree line for line', () => {
+  const roadmap = readFileSync('web/src/programs/2026-11-16/roadmap.md', 'utf8').replaceAll(
+    '**',
+    '',
+  );
+  const lines = roadmap.split('\n');
+  assert.deepEqual(
+    lines.filter((l) => l.startsWith('- ')).map((l) => l.slice(2)),
+    fundamentals.flatMap((d) => d.sections.map((s) => s.text)),
+  );
+  const label = (date, opts) => new Date(date + 'T12:00:00').toLocaleDateString('en-US', opts);
+  assert.deepEqual(
+    lines.filter((l) => /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /.test(l)),
+    fundamentals.map(
+      (d) =>
+        `${label(d.date, { weekday: 'short' })} ${label(d.date, { month: 'short', day: 'numeric' })} · ${d.title}`,
+    ),
+  );
+  assert.deepEqual(
+    lines.filter((l) => l.startsWith('## ')).map((l) => l.replace(/^## (\w+) · .* · /, '$1 ')),
+    [...new Set(fundamentals.map((d) => `${d.code} ${d.phase}`))],
+  );
 });
 test('Every exercise is on the shared exercise list', () => {
   for (const d of days)
@@ -290,8 +607,6 @@ test('Ticking a fixed-target set records that target as its result', () => {
   assert.equal(result.variation, 'tucked');
   assert.equal(result.asPrescribed, true);
 });
-const advancedTo = (name, variation) =>
-  heads([event('advance-' + name, `stage:${name}`, { variation, previous: '' })]);
 test('An exercise without a progression rule shows its written variation, whatever was stored', () => {
   const hold = exerciseOf('2026-10-13', 'b2e0');
   assert.equal(currentVariation(advancedTo('Hollow Hold', 'one-leg'), hold), 'tucked');
@@ -465,7 +780,10 @@ test('A superset is headed by the names of both its exercises', () => {
 test('Today summarizes a program once its last day has passed', () => {
   assert.equal(finishedProgramAt('2026-10-22', {}), null);
   assert.equal(finishedProgramAt('2026-11-15', {}), null);
-  assert.equal(finishedProgramAt('2026-11-16', {}).id, '2026-10-13');
+  // Fundamentals starts the day after the earlier program ends, so that one is never summarized.
+  assert.equal(finishedProgramAt('2026-11-16', {}), null);
+  assert.equal(finishedProgramAt('2027-01-24', {}), null);
+  assert.equal(finishedProgramAt('2027-01-25', {}).id, '2026-11-16');
   assert.equal(finishedProgramAt('2026-10-01', {}), null);
 });
 test('The URL keeps the screen and the chosen day', () => {
@@ -597,62 +915,74 @@ test('Workout times read as a clock while running and in minutes once recorded',
   assert.equal(formatDuration(2880), '48 min');
   assert.equal(formatDuration(4380), '1 h 13 min');
 });
-const repeatEvent = (start, week = 'W1') =>
-  event(`repeat-${start}`, repeatKey(start), { program: '2026-10-13', week, start });
-const withRepeat = (...events) => heads([repeatEvent('2026-11-09'), ...events]);
-test('Repeating W1 from Nov 9 slides W2 back a week', () => {
+const repeatEvent = (start, week = 'F1') =>
+  event(`repeat-${start}`, repeatKey(start), { program: '2026-11-16', week, start });
+const withRepeat = (...events) => heads([repeatEvent('2026-11-23'), ...events]);
+test('Repeating F1 from Nov 23 slides the rest of Fundamentals back a week', () => {
   const map = withRepeat();
   const repeated = calendar(map);
-  assert.equal(repeated.length, 41);
-  assert.equal(new Set(repeated.map((d) => d.date)).size, 41);
-  assert.equal(programsIn(map)[0].end, '2026-11-22');
-  // W2's long run, written for Sat Nov 14.
-  assert.equal(repeated.find((d) => d.date === '2026-11-21').sections[0].text, 'Run: 2.5 mi easy');
-  const nov9 = repeated.find((d) => d.date === '2026-11-09');
-  assert.equal(nov9.code, 'W1 (repeat)');
-  assert.equal(nov9.week, 'W1');
-  assert.equal(nov9.sections[1].text, 'A. Pull-Ups: 5×2-5 · rest 2 min');
-  assert.equal(repeated.find((d) => d.date === '2026-11-16').code, 'W2');
-  assert.equal(programsIn(map)[0].weeks.join(), 'R1,R2,R3,W1,W1 (repeat),W2');
+  assert.equal(repeated.length, 111);
+  assert.equal(new Set(repeated.map((d) => d.date)).size, 111);
+  assert.equal(programsIn(map)[0].end, '2026-11-15');
+  assert.equal(programsIn(map)[1].end, '2027-01-31');
+  // F10's long run, written for Sat Jan 23.
+  assert.equal(repeated.find((d) => d.date === '2027-01-30').sections[0].text, 'Run: 3 mi easy');
+  const nov23 = repeated.find((d) => d.date === '2026-11-23');
+  assert.equal(nov23.code, 'F1 (repeat)');
+  assert.equal(nov23.week, 'F1');
+  assert.equal(nov23.sections[1].text, 'A. Negative Pull-Ups: 4×3 @ 5s · rest 2 min');
+  assert.equal(repeated.find((d) => d.date === '2026-11-30').code, 'F2');
+  assert.equal(programsIn(map)[1].weeks.slice(0, 3).join(), 'F1,F1 (repeat),F2');
 });
 test('A repeated week leaves earlier workouts and their results alone', () => {
-  const map = withRepeat(...tick('2026-11-02', requiredSets('2026-11-02')));
-  const original = calendar(map).find((d) => d.date === '2026-11-02');
-  assert.equal(original.code, 'W1');
-  assert.equal(workoutStatus(original, map, '2026-11-07').id, 'complete');
-  const missed = calendar(map).find((d) => d.date === '2026-11-03');
-  assert.equal(workoutStatus(missed, map, '2026-11-07').id, 'empty');
-  const again = calendar(map).find((d) => d.date === '2026-11-09');
-  assert.equal(workoutStatus(again, map, '2026-11-07').id, 'upcoming');
+  const map = withRepeat(...tick('2026-11-16', requiredSets('2026-11-16')));
+  const original = calendar(map).find((d) => d.date === '2026-11-16');
+  assert.equal(original.code, 'F1');
+  assert.equal(workoutStatus(original, map, '2026-11-21').id, 'complete');
+  const missed = calendar(map).find((d) => d.date === '2026-11-17');
+  assert.equal(workoutStatus(missed, map, '2026-11-21').id, 'empty');
+  const again = calendar(map).find((d) => d.date === '2026-11-23');
+  assert.equal(workoutStatus(again, map, '2026-11-21').id, 'upcoming');
 });
 test('A second repeat rewinds again and is labeled by how often the week has run', () => {
-  const map = heads([repeatEvent('2026-11-09'), repeatEvent('2026-11-16')]);
+  const map = heads([repeatEvent('2026-11-23'), repeatEvent('2026-11-30')]);
   const repeated = calendar(map);
-  assert.equal(repeated.find((d) => d.date === '2026-11-16').code, 'W1 (repeat 2)');
-  assert.equal(repeated.find((d) => d.date === '2026-11-23').code, 'W2');
-  assert.equal(programsIn(map)[0].end, '2026-11-29');
+  assert.equal(repeated.find((d) => d.date === '2026-11-30').code, 'F1 (repeat 2)');
+  assert.equal(repeated.find((d) => d.date === '2026-12-07').code, 'F2');
+  assert.equal(programsIn(map)[1].end, '2027-02-07');
 });
 test('Choosing an earlier week runs every week after it again', () => {
-  const map = heads([repeatEvent('2026-11-09', 'R3')]);
+  // Dec 7 is where F4 is written to start.
+  const map = heads([repeatEvent('2026-12-07', 'F2')]);
   const repeated = calendar(map);
-  assert.equal(repeated.find((d) => d.date === '2026-11-09').code, 'R3 (repeat)');
-  assert.equal(repeated.find((d) => d.date === '2026-11-16').code, 'W1 (repeat)');
-  assert.equal(repeated.find((d) => d.date === '2026-11-23').code, 'W2');
-  assert.equal(programsIn(map)[0].end, '2026-11-29');
+  assert.equal(repeated.find((d) => d.date === '2026-12-07').code, 'F2 (repeat)');
+  assert.equal(repeated.find((d) => d.date === '2026-12-14').code, 'F3 (repeat)');
+  assert.equal(repeated.find((d) => d.date === '2026-12-21').code, 'F4');
+  assert.equal(programsIn(map)[1].end, '2027-02-07');
 });
-const w1 = { program: '2026-10-13', week: 'W1' };
+const f1 = { program: '2026-11-16', week: 'F1' };
 test('A repeat starts on its week’s weekday, today or later, after everything logged', () => {
-  assert.equal(earliestRepeat({}, w1, '2026-11-07'), '2026-11-09');
-  assert.equal(earliestRepeat({}, w1, '2026-11-09'), '2026-11-09');
+  assert.equal(earliestRepeat({}, f1, '2026-11-21'), '2026-11-23');
+  assert.equal(earliestRepeat({}, f1, '2026-11-23'), '2026-11-23');
   // R1 starts on a Tuesday.
-  assert.equal(earliestRepeat({}, { ...w1, week: 'R1' }, '2026-11-07'), '2026-11-10');
-  const logged = heads(tick('2026-11-09', requiredSets('2026-11-09'), '2026-11-07'));
-  assert.equal(lastLoggedDate(logged), '2026-11-09');
-  assert.equal(earliestRepeat(logged, w1, '2026-11-07'), '2026-11-16');
-  assert.ok(previewRepeat(logged, { ...w1, start: '2026-11-09' }, '2026-11-07').problem);
-  assert.ok(previewRepeat({}, { ...w1, start: '2026-11-10' }, '2026-11-07').problem);
-  assert.equal(previewRepeat({}, { ...w1, start: '2026-11-09' }, '2026-11-07').end, '2026-11-22');
-  assert.equal(previewRepeat({}, { ...w1, start: '2026-11-16' }, '2026-11-07').end, '2026-11-29');
+  assert.equal(
+    earliestRepeat({}, { program: '2026-10-13', week: 'R1' }, '2026-11-07'),
+    '2026-11-10',
+  );
+  const logged = heads(tick('2026-11-23', requiredSets('2026-11-23'), '2026-11-21'));
+  assert.equal(lastLoggedDate(logged), '2026-11-23');
+  assert.equal(earliestRepeat(logged, f1, '2026-11-21'), '2026-11-30');
+  assert.ok(previewRepeat(logged, { ...f1, start: '2026-11-23' }, '2026-11-21').problem);
+  assert.ok(previewRepeat({}, { ...f1, start: '2026-11-24' }, '2026-11-21').problem);
+  assert.equal(previewRepeat({}, { ...f1, start: '2026-11-23' }, '2026-11-21').end, '2027-01-31');
+  assert.equal(previewRepeat({}, { ...f1, start: '2026-11-30' }, '2026-11-21').end, '2027-02-07');
+});
+test('A repeat that would run the earlier program into Fundamentals is refused', () => {
+  const w1 = { program: '2026-10-13', week: 'W1', start: '2026-11-09' };
+  assert.equal(
+    previewRepeat({}, w1, '2026-11-07').problem,
+    'That would run into Fundamentals, which starts Nov 16.',
+  );
 });
 test('A tick taken back or an empty clock does not hold a date', () => {
   const map = heads([
@@ -667,43 +997,43 @@ test('A tick taken back or an empty clock does not hold a date', () => {
 });
 test('A repeat clears moves and set counts on the dates it takes over, and no others', () => {
   const map = heads([
-    event('future-move', 'schedule:2026-11-13', {
-      due: '2026-11-14',
-      originalDate: '2026-11-13',
+    event('future-move', 'schedule:2026-11-27', {
+      due: '2026-11-28',
+      originalDate: '2026-11-27',
       lateMove: false,
     }),
-    event('missed-move', 'schedule:2026-11-05', {
-      due: '2026-11-10',
-      originalDate: '2026-11-05',
+    event('missed-move', 'schedule:2026-11-19', {
+      due: '2026-11-24',
+      originalDate: '2026-11-19',
       lateMove: true,
     }),
-    event('future-count', 'config:2026-11-13:b1e0', { count: 4 }),
+    event('future-count', 'config:2026-11-27:b1e0', { count: 3 }),
   ]);
-  const changes = repeatChanges(map, { ...w1, start: '2026-11-09' });
+  const changes = repeatChanges(map, { ...f1, start: '2026-11-23' });
   assert.deepEqual(changes.map((c) => c.entity).sort(), [
-    'config:2026-11-13:b1e0',
-    'repeat:2026-11-09',
-    'schedule:2026-11-13',
+    'config:2026-11-27:b1e0',
+    'repeat:2026-11-23',
+    'schedule:2026-11-27',
   ]);
-  assert.equal(changes.find((c) => c.entity === 'schedule:2026-11-13').data, null);
+  assert.equal(changes.find((c) => c.entity === 'schedule:2026-11-27').data, null);
 });
 test('A repeat can be undone until something is logged from its start on', () => {
-  assert.equal(canUndoRepeat(withRepeat(), '2026-11-09'), true);
-  assert.equal(canUndoRepeat(withRepeat(), '2026-11-16'), false);
-  const earlier = withRepeat(...tick('2026-11-02', requiredSets('2026-11-02')));
-  assert.equal(canUndoRepeat(earlier, '2026-11-09'), true);
-  const logged = withRepeat(...tick('2026-11-09', requiredSets('2026-11-09')));
-  assert.equal(canUndoRepeat(logged, '2026-11-09'), false);
+  assert.equal(canUndoRepeat(withRepeat(), '2026-11-23'), true);
+  assert.equal(canUndoRepeat(withRepeat(), '2026-11-30'), false);
+  const earlier = withRepeat(...tick('2026-11-16', requiredSets('2026-11-16')));
+  assert.equal(canUndoRepeat(earlier, '2026-11-23'), true);
+  const logged = withRepeat(...tick('2026-11-23', requiredSets('2026-11-23')));
+  assert.equal(canUndoRepeat(logged, '2026-11-23'), false);
   const undone = heads([
-    repeatEvent('2026-11-09'),
-    event('undo', repeatKey('2026-11-09'), null, ['repeat-2026-11-09']),
+    repeatEvent('2026-11-23'),
+    event('undo', repeatKey('2026-11-23'), null, ['repeat-2026-11-23']),
   ]);
-  assert.equal(calendar(undone).length, 34);
-  assert.equal(programsIn(undone)[0].end, '2026-11-15');
-  assert.equal(canUndoRepeat(undone, '2026-11-09'), false);
+  assert.equal(calendar(undone).length, 104);
+  assert.equal(programsIn(undone)[1].end, '2027-01-24');
+  assert.equal(canUndoRepeat(undone, '2026-11-23'), false);
 });
 test('Repeat events validate, and malformed ones are rejected', () => {
-  assert.equal(validateEvents([repeatEvent('2026-11-09')]), true);
+  assert.equal(validateEvents([repeatEvent('2026-11-23')]), true);
   assert.equal(validEventData('repeat:2026-11-09', { program: 'x', week: 'W1' }), false);
   assert.equal(validEventData('repeat:2026-11-09', null), true);
 });

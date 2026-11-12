@@ -108,7 +108,7 @@ An exercise's variations in order of difficulty, such as Push-Ups, then Decline,
 _Avoid_: Stage list, tiers
 
 **Assistance**:
-Support that makes a set easier without changing its variation, such as a band or a chair.
+Support that makes a set easier without changing its variation, such as a band, a chair or a jump.
 _Avoid_: Variation, setup
 
 ### Performance

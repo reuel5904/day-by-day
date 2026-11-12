@@ -199,6 +199,32 @@ test('The program summary reports the one test the program has, the Oct 16 dead 
     [['Dead Hang', undefined]],
   );
 });
+test('The Fundamentals summary takes the best of each test and compares it with the first week', () => {
+  const map = heads([
+    logged('2026-11-20', 'b5e0', 0, 0),
+    logged('2026-11-20', 'b6e0', 0, 30),
+    // A dead hang between the first and last weeks is neither the baseline nor the result.
+    logged('2026-12-18', 'b6e0', 0, 60),
+    logged('2027-01-18', 'b1e0', 0, 1),
+    logged('2027-01-18', 'b2e0', 0, 12),
+    logged('2027-01-22', 'b1e0', 0, 24),
+    event('second-hang', 'config:2027-01-22:b2e0', { count: 2 }),
+    logged('2027-01-22', 'b2e0', 0, 50),
+    logged('2027-01-22', 'b2e0', 1, 55),
+  ]);
+  const summary = programSummary(map, programs[1], '2027-01-25');
+  assert.equal(summary.planned, 60);
+  assert.deepEqual(
+    summary.tests.map((t) => [t.name, t.unit, t.best?.value, t.baseline?.value, t.baseline?.date]),
+    [
+      ['Pull-Ups', 'reps', 1, 0, '2026-11-20'],
+      ['Negative Pull-Ups', 'sec', 12, undefined, undefined],
+      ['Chin-Ups', 'reps', undefined, undefined, undefined],
+      ['Dead Hang', 'sec', 55, 30, '2026-11-20'],
+      ['Push-Ups', 'reps', 24, undefined, undefined],
+    ],
+  );
+});
 test('The program summary counts completed workouts against planned ones and the best streak', () => {
   const map = heads(
     ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-23'].flatMap((d) => tickAll(d)),
