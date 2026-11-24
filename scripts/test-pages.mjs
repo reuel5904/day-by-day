@@ -13,6 +13,7 @@ const {
   calendar,
   programsIn,
   canUndoRepeat,
+  defaultRepeat,
   earliestRepeat,
   lastLoggedDate,
   previewRepeat,
@@ -1025,6 +1026,29 @@ test('A week cannot repeat on the date it already starts', () => {
     assert.equal(earliestRepeat({}, f2, today), '2026-11-30');
   assert.ok(previewRepeat({}, { ...f2, start: '2026-11-23' }, '2026-11-24').problem);
   assert.equal(earliestRepeat(withRepeat(), f1, '2026-11-24'), '2026-11-30');
+  const twice = heads([repeatEvent('2026-11-23'), repeatEvent('2026-11-30')]);
+  assert.equal(earliestRepeat(twice, f1, '2026-11-24'), '2026-12-07');
+  // A later repeat leaves Nov 23 open, but F1 already starts Nov 30.
+  const later = heads([repeatEvent('2026-11-30')]);
+  assert.equal(earliestRepeat(later, f1, '2026-11-24'), '2026-11-23');
+  assert.equal(defaultRepeat(later, f1, '2026-11-24'), '2026-12-07');
+  assert.equal(
+    previewRepeat(later, { ...f1, start: '2026-11-30' }, '2026-11-24').problem,
+    'F1 already starts Nov 30.',
+  );
+});
+test('A repeat offers today or later first, and a passed start leaves its earlier days missed', () => {
+  assert.equal(defaultRepeat({}, f1, '2026-11-23'), '2026-11-23');
+  assert.equal(defaultRepeat({}, f1, '2026-11-24'), '2026-11-30');
+  const days = calendar(withRepeat());
+  const statusOn = (date) =>
+    workoutStatus(
+      days.find((d) => d.date === date),
+      withRepeat(),
+      '2026-11-24',
+    ).id;
+  assert.equal(statusOn('2026-11-23'), 'empty');
+  assert.equal(statusOn('2026-11-24'), 'upcoming');
 });
 test('A repeat that would run the earlier program into Fundamentals is refused', () => {
   const w1 = { program: '2026-10-13', week: 'W1', start: '2026-11-09' };

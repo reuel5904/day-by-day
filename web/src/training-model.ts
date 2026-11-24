@@ -365,31 +365,38 @@ export function lastLoggedDate(map: Record<string, Event[]>) {
 }
 const writtenStart = (program: string, week: string) =>
   writtenDays.find((d) => d.program === program && d.week === week)!.date;
-// The earliest date a week can run again: on its weekday, so roadmap notes such as "Saturday is
-// your 4-mile run" stay true, from this calendar week on, and after everything logged.
-export function earliestRepeat(
-  map: Record<string, Event[]>,
-  { program, week }: Pick<Repeat, 'program' | 'week'>,
-  today: string,
-) {
+type RepeatWeek = Pick<Repeat, 'program' | 'week'>;
+// Whether a week already starts on this date, one of its weekday, so that repeating it from there
+// would leave the calendar as it is.
+const alreadyStarts = (map: Record<string, Event[]>, { program, week }: RepeatWeek, date: string) =>
+  calendar(map).some((d) => d.date === date && d.program === program && d.week === week);
+// The first date from `from` on that a week can run again: on its weekday, so roadmap notes such
+// as "Saturday is your 4-mile run" stay true, after everything logged, and not where it already
+// starts.
+function firstRepeat(map: Record<string, Event[]>, week: RepeatWeek, from: string) {
   const logged = lastLoggedDate(map);
-  const monday = mondayOf(today);
-  const from = logged >= monday ? addDays(logged, 1) : monday;
-  const wait = -daysBetween(writtenStart(program, week), from) % 7;
-  const start = addDays(from, wait < 0 ? wait + 7 : wait);
-  // Where the week already starts, running it again would change nothing.
-  const running = calendar(map).find((d) => d.date === start);
-  return running?.program === program && running.week === week ? addDays(start, 7) : start;
+  const open = logged >= from ? addDays(logged, 1) : from;
+  const wait = -daysBetween(writtenStart(week.program, week.week), open) % 7;
+  let start = addDays(open, wait < 0 ? wait + 7 : wait);
+  while (alreadyStarts(map, week, start)) start = addDays(start, 7);
+  return start;
 }
+// The earliest date a week can run again, which may have passed, but only this calendar week.
+export const earliestRepeat = (map: Record<string, Event[]>, week: RepeatWeek, today: string) =>
+  firstRepeat(map, week, mondayOf(today));
+// The date offered first. A start that has passed is there to choose, never the default.
+export const defaultRepeat = (map: Record<string, Event[]>, week: RepeatWeek, today: string) =>
+  firstRepeat(map, week, today);
 // The program as it would run with this repeat, or why it can't.
 export function previewRepeat(map: Record<string, Event[]>, repeat: Repeat, today: string) {
   const earliest = earliestRepeat(map, repeat, today);
-  if (repeat.start < earliest)
-    return { problem: `Choose ${dateLabel(earliest)} or later: earlier dates are taken.` };
+  if (repeat.start < earliest) return { problem: `Choose ${dateLabel(earliest)} or later.` };
   if (daysBetween(earliest, repeat.start) % 7)
     return {
       problem: `Choose a ${dateLabel(earliest, { weekday: 'long' })}, the day this week starts.`,
     };
+  if (alreadyStarts(map, repeat, repeat.start))
+    return { problem: `${repeat.week} already starts ${dateLabel(repeat.start)}.` };
   const event = {
     id: 'preview',
     entity: repeatKey(repeat.start),
