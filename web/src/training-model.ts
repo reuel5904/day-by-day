@@ -343,13 +343,16 @@ export function moveWorkout(d: Day, map: Record<string, Event[]>, today: string,
     ...(missedDeadline ? { missedDeadline } : {}),
   };
 }
-// Whether an event records something done, as opposed to a tick or a clock taken back.
+// Whether an event records something done, as opposed to a tick or a clock taken back, or an
+// imported day with nothing on it.
 function recordsTraining(entity: string, data: any) {
   if (data === null) return false;
   if (entity.startsWith('completion:')) return data.completed === true;
   if (entity.startsWith('set:')) return !data.skipped;
   if (entity.startsWith('notes:')) return data.text !== '';
   if (entity.startsWith('clock:')) return data.elapsed > 0 || data.since !== null;
+  if (entity.startsWith('legacy:'))
+    return data.complete || data.checks.includes(true) || Boolean(data.originalNotes);
   return true;
 }
 // The last workout date with anything logged. Results are saved under that date, so it and
