@@ -366,16 +366,20 @@ export function lastLoggedDate(map: Record<string, Event[]>) {
 const writtenStart = (program: string, week: string) =>
   writtenDays.find((d) => d.program === program && d.week === week)!.date;
 // The earliest date a week can run again: on its weekday, so roadmap notes such as "Saturday is
-// your 4-mile run" stay true, from today on, and after everything logged.
+// your 4-mile run" stay true, from this calendar week on, and after everything logged.
 export function earliestRepeat(
   map: Record<string, Event[]>,
   { program, week }: Pick<Repeat, 'program' | 'week'>,
   today: string,
 ) {
   const logged = lastLoggedDate(map);
-  const from = logged && logged >= today ? addDays(logged, 1) : today;
+  const monday = mondayOf(today);
+  const from = logged >= monday ? addDays(logged, 1) : monday;
   const wait = -daysBetween(writtenStart(program, week), from) % 7;
-  return addDays(from, wait < 0 ? wait + 7 : wait);
+  const start = addDays(from, wait < 0 ? wait + 7 : wait);
+  // Where the week already starts, running it again would change nothing.
+  const running = calendar(map).find((d) => d.date === start);
+  return running?.program === program && running.week === week ? addDays(start, 7) : start;
 }
 // The program as it would run with this repeat, or why it can't.
 export function previewRepeat(map: Record<string, Event[]>, repeat: Repeat, today: string) {

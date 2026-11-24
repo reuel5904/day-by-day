@@ -15,7 +15,7 @@ A named stretch of a program's workouts, such as R3 or W1.
 _Avoid_: Phase, calendar week
 
 **Repeated week**:
-A week run again as new workouts on later dates, with every later week sliding back by the same delay. The earlier workouts and their results stay as they were.
+A week run again as new workouts on later dates, with every later week sliding back by the same delay. It can start as early as the current calendar week, after everything logged. The earlier workouts and their results stay as they were.
 _Avoid_: Moved week, skipped week
 
 **Workout**:

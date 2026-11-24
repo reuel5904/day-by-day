@@ -1877,7 +1877,12 @@ export default function TrainingApp({ user }: { user: User }) {
                                   className="text-link"
                                   onClick={() => {
                                     const week = { program: p.id, week: list[0].week };
-                                    setRepeat({ ...week, start: earliestRepeat(map, week, today) });
+                                    const earliest = earliestRepeat(map, week, today);
+                                    // A start that has passed is there to choose, never the default.
+                                    setRepeat({
+                                      ...week,
+                                      start: earliest < today ? addDays(earliest, 7) : earliest,
+                                    });
                                     setModal('repeat');
                                   }}
                                 >
