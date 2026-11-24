@@ -54,6 +54,7 @@ import {
   isSetComplete,
   dateLabel,
   Day,
+  defaultRepeat,
   earliestRepeat,
   effectiveDate,
   Event,
@@ -1877,7 +1878,7 @@ export default function TrainingApp({ user }: { user: User }) {
                                   className="text-link"
                                   onClick={() => {
                                     const week = { program: p.id, week: list[0].week };
-                                    setRepeat({ ...week, start: earliestRepeat(map, week, today) });
+                                    setRepeat({ ...week, start: defaultRepeat(map, week, today) });
                                     setModal('repeat');
                                   }}
                                 >

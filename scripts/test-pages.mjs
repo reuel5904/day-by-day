@@ -13,6 +13,7 @@ const {
   calendar,
   programsIn,
   canUndoRepeat,
+  defaultRepeat,
   earliestRepeat,
   lastLoggedDate,
   previewRepeat,
@@ -995,14 +996,22 @@ test('Choosing an earlier week runs every week after it again', () => {
   assert.equal(programsIn(map)[1].end, '2027-02-07');
 });
 const f1 = { program: '2026-11-16', week: 'F1' };
-test('A repeat starts on its week’s weekday, today or later, after everything logged', () => {
+test('A repeat starts on its week’s weekday, this calendar week or later, after everything logged', () => {
   assert.equal(earliestRepeat({}, f1, '2026-11-21'), '2026-11-23');
-  assert.equal(earliestRepeat({}, f1, '2026-11-23'), '2026-11-23');
-  // R1 starts on a Tuesday.
-  assert.equal(
-    earliestRepeat({}, { program: '2026-10-13', week: 'R1' }, '2026-11-07'),
-    '2026-11-10',
-  );
+  for (const today of ['2026-11-23', '2026-11-24', '2026-11-29'])
+    assert.equal(earliestRepeat({}, f1, today), '2026-11-23');
+  assert.equal(earliestRepeat({}, f1, '2026-11-30'), '2026-11-30');
+  // R1 starts on a Tuesday, so on a Monday the first one is tomorrow.
+  const r1 = { program: '2026-10-13', week: 'R1' };
+  assert.equal(earliestRepeat({}, r1, '2026-11-07'), '2026-11-03');
+  assert.equal(earliestRepeat({}, r1, '2026-11-02'), '2026-11-03');
+  const thisWeek = { ...f1, start: '2026-11-23' };
+  assert.equal(previewRepeat({}, thisWeek, '2026-11-24').end, '2027-01-31');
+  assert.ok(previewRepeat({}, { ...f1, start: '2026-11-16' }, '2026-11-24').problem);
+  const monday = heads(tick('2026-11-23', requiredSets('2026-11-23').slice(0, 1), '2026-11-23'));
+  assert.equal(earliestRepeat(monday, f1, '2026-11-24'), '2026-11-30');
+  const before = heads(tick('2026-11-17', requiredSets('2026-11-17'), '2026-11-17'));
+  assert.equal(earliestRepeat(before, f1, '2026-11-24'), '2026-11-23');
   const logged = heads(tick('2026-11-23', requiredSets('2026-11-23'), '2026-11-21'));
   assert.equal(lastLoggedDate(logged), '2026-11-23');
   assert.equal(earliestRepeat(logged, f1, '2026-11-21'), '2026-11-30');
@@ -1010,6 +1019,36 @@ test('A repeat starts on its week’s weekday, today or later, after everything 
   assert.ok(previewRepeat({}, { ...f1, start: '2026-11-24' }, '2026-11-21').problem);
   assert.equal(previewRepeat({}, { ...f1, start: '2026-11-23' }, '2026-11-21').end, '2027-01-31');
   assert.equal(previewRepeat({}, { ...f1, start: '2026-11-30' }, '2026-11-21').end, '2027-02-07');
+});
+test('A week cannot repeat on the date it already starts', () => {
+  const f2 = { ...f1, week: 'F2' };
+  for (const today of ['2026-11-23', '2026-11-24'])
+    assert.equal(earliestRepeat({}, f2, today), '2026-11-30');
+  assert.ok(previewRepeat({}, { ...f2, start: '2026-11-23' }, '2026-11-24').problem);
+  assert.equal(earliestRepeat(withRepeat(), f1, '2026-11-24'), '2026-11-30');
+  const twice = heads([repeatEvent('2026-11-23'), repeatEvent('2026-11-30')]);
+  assert.equal(earliestRepeat(twice, f1, '2026-11-24'), '2026-12-07');
+  // A later repeat leaves Nov 23 open, but F1 already starts Nov 30.
+  const later = heads([repeatEvent('2026-11-30')]);
+  assert.equal(earliestRepeat(later, f1, '2026-11-24'), '2026-11-23');
+  assert.equal(defaultRepeat(later, f1, '2026-11-24'), '2026-12-07');
+  assert.equal(
+    previewRepeat(later, { ...f1, start: '2026-11-30' }, '2026-11-24').problem,
+    'F1 already starts Nov 30.',
+  );
+});
+test('A repeat offers today or later first, and a passed start leaves its earlier days missed', () => {
+  assert.equal(defaultRepeat({}, f1, '2026-11-23'), '2026-11-23');
+  assert.equal(defaultRepeat({}, f1, '2026-11-24'), '2026-11-30');
+  const days = calendar(withRepeat());
+  const statusOn = (date) =>
+    workoutStatus(
+      days.find((d) => d.date === date),
+      withRepeat(),
+      '2026-11-24',
+    ).id;
+  assert.equal(statusOn('2026-11-23'), 'empty');
+  assert.equal(statusOn('2026-11-24'), 'upcoming');
 });
 test('A repeat that would run the earlier program into Fundamentals is refused', () => {
   const w1 = { program: '2026-10-13', week: 'W1', start: '2026-11-09' };
