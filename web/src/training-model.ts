@@ -343,7 +343,8 @@ export function moveWorkout(d: Day, map: Record<string, Event[]>, today: string,
     ...(missedDeadline ? { missedDeadline } : {}),
   };
 }
-// Whether an event records something done, as opposed to a tick or a clock taken back.
+// Whether an event records something done, as opposed to a tick or a clock taken back, or an
+// imported day with nothing on it.
 function recordsTraining(entity: string, data: any) {
   if (data === null) return false;
   if (entity.startsWith('completion:')) return data.completed === true;

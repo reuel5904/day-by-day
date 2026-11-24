@@ -1039,7 +1039,7 @@ test('A tick taken back, an empty clock or an empty import does not hold a date'
       actualDate: '2026-11-07',
     }),
     event('idle', 'clock:2026-11-09', { elapsed: 0, since: null }),
-    // The v1 import wrote an entry for every day it knew, ticked or not.
+    // The v1 import wrote an entry for every day v1 had a record of, ticked or not.
     event('empty-import', 'legacy:2026-12-28', {
       checks: [false, false, false, false, false],
       complete: false,
