@@ -1031,7 +1031,7 @@ test('A repeat already in history cannot put two workouts on one date', () => {
   assert.equal(calendar(map).find((d) => d.date === '2026-11-16').program, '2026-11-16');
   assert.equal(calendar(map).find((d) => d.date === '2026-11-15').code, 'W1 (repeat)');
 });
-test('A tick taken back or an empty clock does not hold a date', () => {
+test('A tick taken back, an empty clock or an empty import does not hold a date', () => {
   const map = heads([
     event('unticked', 'completion:2026-11-09:b1e0:0', {
       completed: false,
@@ -1039,8 +1039,23 @@ test('A tick taken back or an empty clock does not hold a date', () => {
       actualDate: '2026-11-07',
     }),
     event('idle', 'clock:2026-11-09', { elapsed: 0, since: null }),
+    // The v1 import wrote an entry for every day it knew, ticked or not.
+    event('empty-import', 'legacy:2026-12-28', {
+      checks: [false, false, false, false, false],
+      complete: false,
+      originalNotes: '',
+    }),
   ]);
   assert.equal(lastLoggedDate(map), '');
+  assert.equal(earliestRepeat(map, f1, '2026-11-23'), '2026-11-23');
+});
+test('An import with a tick, a completion or a note holds its date', () => {
+  for (const data of [
+    { checks: [false, true], complete: false, originalNotes: '' },
+    { checks: [false, false], complete: true, originalNotes: '' },
+    { checks: [false, false], complete: false, originalNotes: 'Felt strong' },
+  ])
+    assert.equal(lastLoggedDate(heads([event('import', 'legacy:2026-12-28', data)])), '2026-12-28');
 });
 test('A repeat clears moves and set counts on the dates it takes over, and no others', () => {
   const map = heads([

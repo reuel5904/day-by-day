@@ -350,6 +350,8 @@ function recordsTraining(entity: string, data: any) {
   if (entity.startsWith('set:')) return !data.skipped;
   if (entity.startsWith('notes:')) return data.text !== '';
   if (entity.startsWith('clock:')) return data.elapsed > 0 || data.since !== null;
+  if (entity.startsWith('legacy:'))
+    return data.complete || data.checks.includes(true) || Boolean(data.originalNotes);
   return true;
 }
 // The last workout date with anything logged. Results are saved under that date, so it and
