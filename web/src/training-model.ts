@@ -407,19 +407,59 @@ export function previewRepeat(map: Record<string, Event[]>, repeat: Repeat, toda
     data: repeat,
     at: '',
   };
-  const { programs, cutShort } = scheduleOf({ ...map, [event.entity]: [event] });
+  const preview = { ...map, [event.entity]: [event] };
+  const { programs, cutShort } = scheduleOf(preview);
   const index = programs.findIndex((p) => p.id === repeat.program);
   const next = programs[index + 1];
   if (next && cutShort.has(repeat.program))
     return { problem: `That would run into ${next.title}, which starts ${dateLabel(next.start)}.` };
-  return { end: programs[index].end };
+  return {
+    end: programs[index].end,
+    previousEnd: programsIn(map)[index].end,
+    planned: plannedNotice(map, repeat, preview),
+  };
+}
+// What this repeat would do to the ones already planned in its program. `preview` is the history
+// with it chosen.
+function plannedNotice(
+  map: Record<string, Event[]>,
+  repeat: Repeat,
+  preview: Record<string, Event[]>,
+) {
+  const planned = repeatsIn(map).filter(
+    (r) => r.program === repeat.program && canUndoRepeat(map, r.start),
+  );
+  if (!planned.length) return '';
+  const runs = calendar(preview).filter(
+    (d) => d.program === repeat.program && d.week === repeat.week,
+  );
+  const starts = runs.filter((d, i) => d.code !== runs[i - 1]?.code).map((d) => dateLabel(d.date));
+  const outcome = (r: Repeat) => {
+    if (r.start === repeat.start) return '. This replaces it.';
+    const { [repeatKey(r.start)]: _removed, ...without } = preview;
+    return alreadyStarts(without, r, r.start)
+      ? ', and would start then anyway.'
+      : ', and that stays.';
+  };
+  return [
+    ...planned.map((r) => `${r.week} already repeats from ${dateLabel(r.start)}${outcome(r)}`),
+    `${repeat.week} would run from ${starts.slice(0, -1).join(', ')} and ${starts.at(-1)}.`,
+  ].join(' ');
 }
 // Choosing a repeat also clears moves and set counts on the dates it takes over, since those
-// dates now hold different workouts.
+// dates now hold different workouts. From the program's next repeat on they hold the same ones.
 export function repeatChanges(map: Record<string, Event[]>, repeat: Repeat) {
+  const until = repeatsIn(map).find(
+    (r) => r.program === repeat.program && r.start > repeat.start,
+  )?.start;
   const cleared = Object.keys(map).filter((entity) => {
     const date = entity.match(/^(?:schedule|config):(\d{4}-\d{2}-\d{2})/)?.[1];
-    return date && date >= repeat.start && map[entity].some((v) => v.data !== null);
+    return (
+      date &&
+      date >= repeat.start &&
+      (!until || date < until) &&
+      map[entity].some((v) => v.data !== null)
+    );
   });
   return [
     { entity: repeatKey(repeat.start), data: repeat },

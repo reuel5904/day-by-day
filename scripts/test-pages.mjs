@@ -1050,6 +1050,66 @@ test('A repeat offers today or later first, and a passed start leaves its earlie
   assert.equal(statusOn('2026-11-23'), 'empty');
   assert.equal(statusOn('2026-11-24'), 'upcoming');
 });
+const plannedText = (map, week, start) =>
+  previewRepeat(map, { ...f1, week, start }, '2026-11-24').planned;
+test('A repeat before or after one already planned says that one stays, or changes nothing', () => {
+  const map = heads([repeatEvent('2026-11-30')]);
+  assert.equal(
+    plannedText(map, 'F1', '2026-11-23'),
+    'F1 already repeats from Nov 30, and that stays. F1 would run from Nov 16, Nov 23 and Nov 30.',
+  );
+  assert.equal(
+    plannedText(map, 'F1', '2026-12-07'),
+    'F1 already repeats from Nov 30, and that stays. F1 would run from Nov 16, Nov 30 and Dec 7.',
+  );
+  assert.equal(
+    plannedText(heads([repeatEvent('2026-11-30', 'F2')]), 'F1', '2026-11-23'),
+    'F2 already repeats from Nov 30, and would start then anyway. F1 would run from Nov 16 and Nov 23.',
+  );
+  assert.equal(
+    plannedText(
+      heads([repeatEvent('2026-11-30', 'F2'), repeatEvent('2026-12-07', 'F2')]),
+      'F1',
+      '2026-11-23',
+    ),
+    'F2 already repeats from Nov 30, and would start then anyway. F2 already repeats from Dec 7, and that stays. F1 would run from Nov 16 and Nov 23.',
+  );
+});
+test('A repeat from the date another is planned says it replaces that one', () => {
+  assert.equal(
+    plannedText(heads([repeatEvent('2026-11-30')]), 'F2', '2026-11-30'),
+    'F1 already repeats from Nov 30. This replaces it. F2 would run from Nov 23 and Nov 30.',
+  );
+  const two = heads([repeatEvent('2026-11-30'), repeatEvent('2026-12-07')]);
+  assert.equal(
+    plannedText(two, 'F2', '2026-11-30'),
+    'F1 already repeats from Nov 30. This replaces it. F1 already repeats from Dec 7, and that stays. F2 would run from Nov 23, Nov 30 and Dec 14.',
+  );
+});
+test('A repeat gives the end it would move the program from as well as to', () => {
+  const ends = (map, week, start) => {
+    const { previousEnd, end } = previewRepeat(map, { ...f1, week, start }, '2026-11-24');
+    return [previousEnd, end];
+  };
+  const map = heads([repeatEvent('2026-11-30')]);
+  assert.deepEqual(ends({}, 'F1', '2026-11-30'), ['2027-01-24', '2027-02-07']);
+  assert.deepEqual(ends(map, 'F1', '2026-11-23'), ['2027-02-07', '2027-02-07']);
+  assert.deepEqual(ends(map, 'F1', '2026-12-07'), ['2027-02-07', '2027-02-14']);
+  assert.deepEqual(ends(map, 'F2', '2026-11-30'), ['2027-02-07', '2027-01-31']);
+});
+test('A repeat that can no longer be undone is not mentioned, nor one that was undone', () => {
+  assert.equal(plannedText({}, 'F1', '2026-11-30'), '');
+  assert.equal(
+    plannedText(withRepeat(), 'F1', '2026-11-30'),
+    'F1 already repeats from Nov 23, and that stays. F1 would run from Nov 16, Nov 23 and Nov 30.',
+  );
+  const logged = withRepeat(
+    ...tick('2026-11-23', requiredSets('2026-11-23').slice(0, 1), '2026-11-23'),
+  );
+  assert.equal(plannedText(logged, 'F1', '2026-11-30'), '');
+  const undone = withRepeat(event('undo', repeatKey('2026-11-23'), null, ['repeat-2026-11-23']));
+  assert.equal(plannedText(undone, 'F1', '2026-11-30'), '');
+});
 test('A repeat that would run the earlier program into Fundamentals is refused', () => {
   const w1 = { program: '2026-10-13', week: 'W1', start: '2026-11-09' };
   assert.equal(
@@ -1117,6 +1177,26 @@ test('A repeat clears moves and set counts on the dates it takes over, and no ot
     'schedule:2026-11-27',
   ]);
   assert.equal(changes.find((c) => c.entity === 'schedule:2026-11-27').data, null);
+});
+test('A repeat before one already planned clears no moves or set counts from that one on', () => {
+  const map = heads([
+    repeatEvent('2026-11-30'),
+    event('taken-over', 'config:2026-11-27:b1e0', { count: 3 }),
+    event('first-kept', 'config:2026-11-30:b1e0', { count: 3 }),
+    event('kept-move', 'schedule:2026-12-10', {
+      due: '2026-12-11',
+      originalDate: '2026-12-10',
+      lateMove: false,
+    }),
+  ]);
+  const cleared = (week, start) =>
+    repeatChanges(map, { ...f1, week, start })
+      .filter((c) => c.data === null)
+      .map((c) => c.entity)
+      .sort();
+  assert.deepEqual(cleared('F1', '2026-11-23'), ['config:2026-11-27:b1e0']);
+  assert.deepEqual(cleared('F2', '2026-11-30'), ['config:2026-11-30:b1e0', 'schedule:2026-12-10']);
+  assert.deepEqual(cleared('F1', '2026-12-07'), ['schedule:2026-12-10']);
 });
 test('A repeat can be undone until something is logged from its start on', () => {
   assert.equal(canUndoRepeat(withRepeat(), '2026-11-23'), true);
