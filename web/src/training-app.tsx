@@ -128,6 +128,8 @@ const idleTimer: TimerState = {
 };
 const firstToday = (days: Day[], today: string) =>
   days.find((d) => d.date >= today)?.date || days.at(-1)!.date;
+const endLabel = (date: string) =>
+  dateLabel(date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 const remainingAt = (t: TimerState) =>
   t.running && t.end ? Math.max(0, Math.ceil((t.end - Date.now()) / 1000)) : t.remaining;
 // Only the countdown re-renders while a timer runs, not the whole app.
@@ -1047,10 +1049,13 @@ export default function TrainingApp({ user }: { user: User }) {
   };
   const repeatPreview = repeat && previewRepeat(map, repeat, today);
   const confirmRepeat = () => {
-    if (!repeat || repeatPreview?.problem) return;
+    if (!repeat || !repeatPreview?.end) return;
     writeMany(repeatChanges(map, repeat));
     setModal(null);
-    notify(`${repeat.week} repeats from ${dateLabel(repeat.start)}. Later weeks moved back.`);
+    const movedBack = repeatPreview.end > repeatPreview.previousEnd;
+    notify(
+      `${repeat.week} repeats from ${dateLabel(repeat.start)}.${movedBack ? ' Later weeks moved back.' : ''}`,
+    );
   };
 
   return (
@@ -2304,17 +2309,22 @@ export default function TrainingApp({ user }: { user: User }) {
                   <div className="notice">{repeatPreview.problem}</div>
                 ) : (
                   repeatPreview?.end && (
-                    <div className="notice">
-                      <CalendarDays size={17} />
-                      The program now ends{' '}
-                      {dateLabel(repeatPreview.end, {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                      .
-                    </div>
+                    <>
+                      {repeatPreview.planned && (
+                        <div className="notice">{repeatPreview.planned}</div>
+                      )}
+                      <div className="notice">
+                        <CalendarDays size={17} />
+                        The program{' '}
+                        {repeatPreview.end === repeatPreview.previousEnd
+                          ? 'still'
+                          : 'now'} ends {endLabel(repeatPreview.end)}
+                        {repeatPreview.planned &&
+                          repeatPreview.end !== repeatPreview.previousEnd &&
+                          ` instead of ${endLabel(repeatPreview.previousEnd)}`}
+                        .
+                      </div>
+                    </>
                   )
                 )}
                 <button

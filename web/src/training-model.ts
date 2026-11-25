@@ -407,28 +407,60 @@ export function previewRepeat(map: Record<string, Event[]>, repeat: Repeat, toda
     data: repeat,
     at: '',
   };
-  const { programs, cutShort } = scheduleOf({ ...map, [event.entity]: [event] });
+  const { days, programs, cutShort } = scheduleOf({ ...map, [event.entity]: [event] });
   const index = programs.findIndex((p) => p.id === repeat.program);
   const next = programs[index + 1];
   if (next && cutShort.has(repeat.program))
     return { problem: `That would run into ${next.title}, which starts ${dateLabel(next.start)}.` };
-  return { end: programs[index].end };
+  return {
+    end: programs[index].end,
+    previousEnd: programsIn(map)[index].end,
+    planned: plannedNotice(map, repeat, days),
+  };
+}
+// What the repeats already planned in the program mean for this one, given the days it would leave.
+function plannedNotice(map: Record<string, Event[]>, repeat: Repeat, days: Day[]) {
+  const planned = undoableRepeats(map).filter((r) => r.program === repeat.program);
+  if (!planned.length) return '';
+  const runs = days.filter((d) => d.program === repeat.program && d.week === repeat.week);
+  const starts = runs.filter((d, i) => d.code !== runs[i - 1]?.code).map((d) => dateLabel(d.date));
+  return [
+    ...planned.map(
+      (r) =>
+        `${r.week} already repeats from ${dateLabel(r.start)}${
+          r.start === repeat.start ? '. This replaces it.' : ', and that stays.'
+        }`,
+    ),
+    `${repeat.week} would run from ${starts.slice(0, -1).join(', ')} and ${starts.at(-1)}.`,
+  ].join(' ');
 }
 // Choosing a repeat also clears moves and set counts on the dates it takes over, since those
-// dates now hold different workouts.
+// dates now hold different workouts. From the program's next repeat on they hold the same ones.
 export function repeatChanges(map: Record<string, Event[]>, repeat: Repeat) {
+  const until = repeatsIn(map).find(
+    (r) => r.program === repeat.program && r.start > repeat.start,
+  )?.start;
   const cleared = Object.keys(map).filter((entity) => {
     const date = entity.match(/^(?:schedule|config):(\d{4}-\d{2}-\d{2})/)?.[1];
-    return date && date >= repeat.start && map[entity].some((v) => v.data !== null);
+    return (
+      date &&
+      date >= repeat.start &&
+      (!until || date < until) &&
+      map[entity].some((v) => v.data !== null)
+    );
   });
   return [
     { entity: repeatKey(repeat.start), data: repeat },
     ...cleared.map((entity) => ({ entity, data: null })),
   ];
 }
-// The repeated week starting on a date, if it can still be undone.
+// The repeats that can still be undone, with nothing logged from their start on.
+function undoableRepeats(map: Record<string, Event[]>) {
+  const logged = lastLoggedDate(map);
+  return repeatsIn(map).filter((r) => r.start > logged);
+}
 export const canUndoRepeat = (map: Record<string, Event[]>, start: string) =>
-  repeatsIn(map).some((r) => r.start === start) && lastLoggedDate(map) < start;
+  undoableRepeats(map).some((r) => r.start === start);
 export const setCount = (day: Day, map: Record<string, Event[]>, e: Exercise) =>
   latest(map, `config:${day.date}:${e.id}`)?.count || e.count;
 export function workoutSets(day: Day, map: Record<string, Event[]>) {
