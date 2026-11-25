@@ -1050,9 +1050,9 @@ test('A repeat offers today or later first, and a passed start leaves its earlie
   assert.equal(statusOn('2026-11-23'), 'empty');
   assert.equal(statusOn('2026-11-24'), 'upcoming');
 });
-const plannedText = (map, week, start, today = '2026-11-24') =>
-  previewRepeat(map, { ...f1, week, start }, today).planned;
-test('A repeat before or after one already planned says both stay', () => {
+const plannedText = (map, week, start) =>
+  previewRepeat(map, { ...f1, week, start }, '2026-11-24').planned;
+test('A repeat before or after one already planned says that one stays, or changes nothing', () => {
   const map = heads([repeatEvent('2026-11-30')]);
   assert.equal(
     plannedText(map, 'F1', '2026-11-23'),
@@ -1064,7 +1064,15 @@ test('A repeat before or after one already planned says both stay', () => {
   );
   assert.equal(
     plannedText(heads([repeatEvent('2026-11-30', 'F2')]), 'F1', '2026-11-23'),
-    'F2 already repeats from Nov 30, and that stays. F1 would run from Nov 16 and Nov 23.',
+    'F2 already repeats from Nov 30, and would start then anyway. F1 would run from Nov 16 and Nov 23.',
+  );
+  assert.equal(
+    plannedText(
+      heads([repeatEvent('2026-11-30', 'F2'), repeatEvent('2026-12-07', 'F2')]),
+      'F1',
+      '2026-11-23',
+    ),
+    'F2 already repeats from Nov 30, and would start then anyway. F2 already repeats from Dec 7, and that stays. F1 would run from Nov 16 and Nov 23.',
   );
 });
 test('A repeat from the date another is planned says it replaces that one', () => {

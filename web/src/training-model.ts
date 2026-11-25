@@ -407,7 +407,8 @@ export function previewRepeat(map: Record<string, Event[]>, repeat: Repeat, toda
     data: repeat,
     at: '',
   };
-  const { days, programs, cutShort } = scheduleOf({ ...map, [event.entity]: [event] });
+  const preview = { ...map, [event.entity]: [event] };
+  const { programs, cutShort } = scheduleOf(preview);
   const index = programs.findIndex((p) => p.id === repeat.program);
   const next = programs[index + 1];
   if (next && cutShort.has(repeat.program))
@@ -415,22 +416,33 @@ export function previewRepeat(map: Record<string, Event[]>, repeat: Repeat, toda
   return {
     end: programs[index].end,
     previousEnd: programsIn(map)[index].end,
-    planned: plannedNotice(map, repeat, days),
+    planned: plannedNotice(map, repeat, preview),
   };
 }
-// What the repeats already planned in the program mean for this one, given the days it would leave.
-function plannedNotice(map: Record<string, Event[]>, repeat: Repeat, days: Day[]) {
-  const planned = undoableRepeats(map).filter((r) => r.program === repeat.program);
+// What this repeat would do to the ones already planned in its program. `preview` is the history
+// with it chosen.
+function plannedNotice(
+  map: Record<string, Event[]>,
+  repeat: Repeat,
+  preview: Record<string, Event[]>,
+) {
+  const planned = repeatsIn(map).filter(
+    (r) => r.program === repeat.program && canUndoRepeat(map, r.start),
+  );
   if (!planned.length) return '';
-  const runs = days.filter((d) => d.program === repeat.program && d.week === repeat.week);
+  const runs = calendar(preview).filter(
+    (d) => d.program === repeat.program && d.week === repeat.week,
+  );
   const starts = runs.filter((d, i) => d.code !== runs[i - 1]?.code).map((d) => dateLabel(d.date));
+  const outcome = (r: Repeat) => {
+    if (r.start === repeat.start) return '. This replaces it.';
+    const { [repeatKey(r.start)]: _removed, ...without } = preview;
+    return alreadyStarts(without, r, r.start)
+      ? ', and would start then anyway.'
+      : ', and that stays.';
+  };
   return [
-    ...planned.map(
-      (r) =>
-        `${r.week} already repeats from ${dateLabel(r.start)}${
-          r.start === repeat.start ? '. This replaces it.' : ', and that stays.'
-        }`,
-    ),
+    ...planned.map((r) => `${r.week} already repeats from ${dateLabel(r.start)}${outcome(r)}`),
     `${repeat.week} would run from ${starts.slice(0, -1).join(', ')} and ${starts.at(-1)}.`,
   ].join(' ');
 }
@@ -454,13 +466,9 @@ export function repeatChanges(map: Record<string, Event[]>, repeat: Repeat) {
     ...cleared.map((entity) => ({ entity, data: null })),
   ];
 }
-// The repeats that can still be undone, with nothing logged from their start on.
-function undoableRepeats(map: Record<string, Event[]>) {
-  const logged = lastLoggedDate(map);
-  return repeatsIn(map).filter((r) => r.start > logged);
-}
+// The repeated week starting on a date, if it can still be undone.
 export const canUndoRepeat = (map: Record<string, Event[]>, start: string) =>
-  undoableRepeats(map).some((r) => r.start === start);
+  repeatsIn(map).some((r) => r.start === start) && lastLoggedDate(map) < start;
 export const setCount = (day: Day, map: Record<string, Event[]>, e: Exercise) =>
   latest(map, `config:${day.date}:${e.id}`)?.count || e.count;
 export function workoutSets(day: Day, map: Record<string, Event[]>) {
